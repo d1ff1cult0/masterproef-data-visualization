@@ -924,6 +924,10 @@ export const STATUS_UPDATES: StatusUpdate[] = [
     title: "MAE Investigation, Notebooks 9 & 10, and Thesis Progress",
     date: "Experimental results, head discrepancy, literature and writing",
     content: [
+      {
+        type: "paragraph",
+        text: "A brief note: I did not really know what to do after implementing notebooks 9–12, and I could not spend a lot of time on the thesis since the last meeting, as I helped organise VTK's jobfair last week.",
+      },
       { type: "heading", level: 2, text: "MAE Difference Investigation" },
       {
         type: "paragraph",
