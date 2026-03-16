@@ -53,10 +53,10 @@ export default function Dashboard() {
         <div className="flex items-center justify-between px-6 h-14">
           <div className="flex items-center gap-3">
             <h1 className="text-base font-semibold tracking-tight text-zinc-900">
-              EPF Dashboard
+              Master Thesis: EPF Results Dashboard
             </h1>
             <span className="text-xs text-zinc-400 hidden sm:inline">
-              Electricity Price Forecasting
+              - Jarne Plessers
             </span>
           </div>
         </div>
