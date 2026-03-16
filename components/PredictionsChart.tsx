@@ -5,15 +5,21 @@ import {
   ComposedChart,
   Line,
   Area,
+  Bar,
+  BarChart,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
   ReferenceArea,
+  ReferenceLine,
   Legend,
 } from "recharts";
 import type { SelectedModel, PredictionResponse, PredictionPoint } from "@/lib/types";
+import { computeExtremeEventStats } from "@/lib/extreme-events";
+import ExtremeEventStatsCard from "./ExtremeEventStatsCard";
 
 interface PredictionsChartProps {
   selectedModels: SelectedModel[];
@@ -340,6 +346,72 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
     }[];
   }, [viewData, modelKeys]);
 
+  // Residuals: actual - predicted (positive = underpredicting, negative = overpredicting)
+  const residualsData = useMemo(() => {
+    return viewData.map((p) => {
+      const pt: Record<string, number | string> = {
+        date: p.date,
+        index: p.index,
+      };
+      for (const { prefix } of modelKeys) {
+        const actual = p.y_test as number;
+        const pred = Number(p[`${prefix}_mean`]) ?? 0;
+        pt[`${prefix}_residual`] = actual != null && !Number.isNaN(actual) ? actual - pred : 0;
+      }
+      return pt;
+    });
+  }, [viewData, modelKeys]);
+
+  // Histogram for residual distribution (tail behaviour)
+  const RESIDUAL_BINS = 20;
+  const histogramData = useMemo(() => {
+    if (residualsData.length === 0 || modelKeys.length === 0) return [];
+    const allResiduals = residualsData.flatMap((p) =>
+      modelKeys.map(({ prefix }) => Number(p[`${prefix}_residual`]) ?? 0)
+    ).filter((v) => !Number.isNaN(v));
+    if (allResiduals.length === 0) return [];
+    const min = Math.min(...allResiduals);
+    const max = Math.max(...allResiduals);
+    const range = Math.max(max - min, 1);
+    const binWidth = range / RESIDUAL_BINS;
+
+    const bins: Record<string, number | string>[] = [];
+    for (let i = 0; i < RESIDUAL_BINS; i++) {
+      const binCenter = min + (i + 0.5) * binWidth;
+      const row: Record<string, number | string> = {
+        bin: `${binCenter.toFixed(0)}`,
+        binCenter,
+      };
+      for (const { prefix } of modelKeys) {
+        let count = 0;
+        for (const p of residualsData) {
+          const r = Number(p[`${prefix}_residual`]) ?? 0;
+          if (Number.isNaN(r)) continue;
+          const binIdx = Math.min(Math.floor((r - min) / binWidth), RESIDUAL_BINS - 1);
+          if (binIdx === i && binIdx >= 0) count++;
+        }
+        row[`${prefix}_count`] = count;
+      }
+      bins.push(row);
+    }
+    return bins;
+  }, [residualsData, modelKeys]);
+
+  const residualMeans = useMemo(() => {
+    return modelKeys.map(({ prefix, label, color }) => {
+      const sum = residualsData.reduce((s, p) => s + (Number(p[`${prefix}_residual`]) ?? 0), 0);
+      const mean = residualsData.length > 0 ? sum / residualsData.length : 0;
+      return { label, color, mean };
+    });
+  }, [residualsData, modelKeys]);
+
+  const extremeEventStats = useMemo(() => {
+    if (viewData.length === 0 || modelKeys.length === 0) return null;
+    const modelKeysForExtreme = modelKeys.map((m) => ({ prefix: m.prefix, label: m.label, color: m.color }));
+    const overallMaes = Object.fromEntries(viewMetrics.map((m) => [m.label, m.mae]));
+    return computeExtremeEventStats(viewData, modelKeysForExtreme, overallMaes);
+  }, [viewData, modelKeys, viewMetrics]);
+
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between">
@@ -558,6 +630,146 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
               </ComposedChart>
             </ResponsiveContainer>
           </div>
+
+          {/* Residuals: time series (bias + tail behaviour) */}
+          <div className="border border-zinc-200 rounded-lg p-4 bg-white">
+            <h3 className="text-sm font-medium text-zinc-700 mb-2">
+              Residuals (Actual − Predicted)
+            </h3>
+            <p className="text-xs text-zinc-500 mb-3">
+              Positive = underpredicting, negative = overpredicting. Mean residual indicates bias; spread indicates tail behaviour.
+            </p>
+            <ResponsiveContainer width="100%" height={280}>
+              <ComposedChart
+                data={residualsData}
+                margin={{ top: 10, right: 20, left: 10, bottom: 30 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 9, fill: "#71717a" }}
+                  tickFormatter={formatXTick}
+                  interval="preserveStartEnd"
+                  stroke="#d4d4d8"
+                  angle={-30}
+                  textAnchor="end"
+                  height={50}
+                />
+                <YAxis
+                  tick={{ fontSize: 10, fill: "#71717a" }}
+                  stroke="#d4d4d8"
+                  label={{
+                    value: "Residual (EUR/MWh)",
+                    angle: -90,
+                    position: "insideLeft",
+                    style: { fontSize: 10, fill: "#a1a1aa" },
+                  }}
+                />
+                <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="4 4" strokeWidth={1} />
+                <Tooltip
+                  contentStyle={{
+                    fontSize: 11,
+                    backgroundColor: "#ffffff",
+                    border: "1px solid #e4e4e7",
+                    borderRadius: 6,
+                  }}
+                  labelFormatter={(label) => String(label)}
+                />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                {modelKeys.map(({ prefix, color, label }) => (
+                  <Line
+                    key={prefix}
+                    dataKey={`${prefix}_residual`}
+                    stroke={color}
+                    strokeWidth={1.2}
+                    dot={false}
+                    name={label}
+                    isAnimationActive={false}
+                  />
+                ))}
+              </ComposedChart>
+            </ResponsiveContainer>
+            {residualMeans.length > 0 && (
+              <div className="flex flex-wrap gap-4 mt-2 text-xs">
+                {residualMeans.map(({ label, color, mean }) => (
+                  <span key={label} className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+                    <span className="text-zinc-600">{label}:</span>
+                    <span className={`font-mono tabular-nums ${mean > 2 ? "text-amber-600" : mean < -2 ? "text-amber-600" : "text-zinc-500"}`}>
+                      mean = {mean.toFixed(2)} {mean > 0 ? "(underpredicting)" : mean < 0 ? "(overpredicting)" : "(unbiased)"}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Residual distribution histogram (tail behaviour) */}
+          {histogramData.length > 0 && (
+            <div className="border border-zinc-200 rounded-lg p-4 bg-white">
+              <h3 className="text-sm font-medium text-zinc-700 mb-2">
+                Residual Distribution
+              </h3>
+              <p className="text-xs text-zinc-500 mb-3">
+                Histogram of residuals. Heavy tails or skew indicate asymmetric prediction errors.
+              </p>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart
+                  data={histogramData}
+                  margin={{ top: 10, right: 20, left: 10, bottom: 30 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
+                  <XAxis
+                    dataKey="bin"
+                    tick={{ fontSize: 9, fill: "#71717a" }}
+                    stroke="#d4d4d8"
+                    label={{
+                      value: "Residual (EUR/MWh)",
+                      position: "insideBottom",
+                      offset: -5,
+                      style: { fontSize: 10, fill: "#a1a1aa" },
+                    }}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fill: "#71717a" }}
+                    stroke="#d4d4d8"
+                    label={{
+                      value: "Count",
+                      angle: -90,
+                      position: "insideLeft",
+                      style: { fontSize: 10, fill: "#a1a1aa" },
+                    }}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      fontSize: 11,
+                      backgroundColor: "#ffffff",
+                      border: "1px solid #e4e4e7",
+                      borderRadius: 6,
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  {modelKeys.map(({ prefix, color, label }) => (
+                    <Bar
+                      key={prefix}
+                      dataKey={`${prefix}_count`}
+                      name={label}
+                      fill={color}
+                      fillOpacity={0.7}
+                      radius={[2, 2, 0, 0]}
+                      isAnimationActive={false}
+                    >
+                      {histogramData.map((_, i) => (
+                        <Cell key={i} fill={color} />
+                      ))}
+                    </Bar>
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {extremeEventStats && <ExtremeEventStatsCard stats={extremeEventStats} />}
 
           {/* Metrics table */}
           {viewMetrics.length > 0 && (

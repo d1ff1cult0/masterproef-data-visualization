@@ -23,9 +23,6 @@ export default function Sidebar({
       .then((data) => {
         setExperiments(data.experiments);
         setLoading(false);
-        if (data.experiments.length > 0) {
-          setExpandedExp(data.experiments[0].name);
-        }
       })
       .catch(() => setLoading(false));
   }, []);

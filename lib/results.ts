@@ -130,3 +130,54 @@ export function getRunCount(experiment: string, model: string): number {
   if (!fs.existsSync(modelDir)) return 0;
   return fs.readdirSync(modelDir).filter((e) => e.startsWith("run_")).length;
 }
+
+export interface BestModelEntry {
+  experiment: string;
+  model: string;
+  experimentDisplayName: string;
+  modelDisplayName: string;
+  rank: number;
+  mae: number;
+  summary: ModelSummary | null;
+  runs: RunMetrics[];
+}
+
+/**
+ * Returns the top N models ranked by MAE (ascending).
+ * Uses summary.avg.MAE when available, otherwise the mean of runs' MAE.
+ */
+export function getBestModels(n: number = 5): BestModelEntry[] {
+  const experiments = listExperiments();
+  const candidates: BestModelEntry[] = [];
+
+  for (const exp of experiments) {
+    for (const modelInfo of exp.models) {
+      const runs = readAllRunMetrics(exp.name, modelInfo.name);
+      const summary = readModelSummary(exp.name, modelInfo.name);
+
+      let mae: number;
+      if (summary?.avg?.MAE != null && !Number.isNaN(summary.avg.MAE)) {
+        mae = summary.avg.MAE;
+      } else if (runs.length > 0) {
+        const maes = runs.map((r) => r.MAE).filter((v) => v != null && !Number.isNaN(v));
+        mae = maes.length > 0 ? maes.reduce((a, b) => a + b, 0) / maes.length : Infinity;
+      } else {
+        continue;
+      }
+
+      candidates.push({
+        experiment: exp.name,
+        model: modelInfo.name,
+        experimentDisplayName: exp.displayName,
+        modelDisplayName: modelInfo.displayName,
+        rank: 0,
+        mae,
+        summary,
+        runs,
+      });
+    }
+  }
+
+  candidates.sort((a, b) => a.mae - b.mae);
+  return candidates.slice(0, n).map((c, i) => ({ ...c, rank: i + 1 }));
+}

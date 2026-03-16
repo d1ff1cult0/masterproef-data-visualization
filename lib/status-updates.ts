@@ -918,4 +918,109 @@ export const STATUS_UPDATES: StatusUpdate[] = [
       },
     ],
   },
+  {
+    id: "06",
+    number: 6,
+    title: "MAE Investigation, Notebooks 9 & 10, and Thesis Progress",
+    date: "Experimental results, head discrepancy, literature and writing",
+    content: [
+      { type: "heading", level: 2, text: "MAE Difference Investigation" },
+      {
+        type: "paragraph",
+        text: "Following the concerns raised in the previous status update about models performing worse after the refactoring (MAE around 20–25 instead of the 10–12 observed in earlier experiments), I investigated the cause of this discrepancy.",
+      },
+      {
+        type: "paragraph",
+        text: "I compared the experimental setup before and after the refactoring, focusing on the train/test split and evaluation methodology. The key finding is that the difference was indeed likely due to the different training and test sets used in the two setups. The pre-refactoring experiments used a different temporal split (e.g. training on 2023–2025 data with a shorter test window), whereas the refactored pipeline uses a fixed split: training from 2023-02-01, validation as the last 10% of the training period, and the test set as the last 6 months of the dataset (approximately August 2025 to February 2026).",
+      },
+      {
+        type: "paragraph",
+        text: "After aligning the methodology and re-running experiments, the results are now consistently closer to MAE values around 20, which is in line with what one would expect given the more recent and potentially more volatile test period. This confirms that the refactoring did not introduce a systematic error; the apparent performance drop was attributable to the different evaluation setup rather than to the modular codebase itself.",
+      },
+      { type: "heading", level: 2, text: "Notebook 9: Mixture-of-Experts Transformer Comparison" },
+      {
+        type: "paragraph",
+        text: "Notebook 9 compares the standard Probabilistic Transformer (Johnson SU head) against a Mixture-of-Experts (MoE) architecture and a shared-backbone mixture head. The key distinction is architectural: the Mixture JSU model uses a single backbone with a mixture of Johnson SU distributions at the output (shared representation, specialisation only at the parameter level), whereas the MoE Transformer uses separate expert networks with a gating mechanism, allowing each expert to specialise in distinct price regimes (e.g. normal, spike, low-negative).",
+      },
+      {
+        type: "table",
+        table: {
+          caption: "Mixture-of-Experts and mixture head comparison (Notebook 9).",
+          headers: ["Model", "MAE", "RMSE", "R²", "PICP", "MPIW", "CRPS"],
+          rows: [
+            ["Mixture JSU (3 components)", 19.85, 26.66, 0.494, 0.872, 81.6, 14.48],
+            ["Baseline (Johnson SU)", 20.30, 27.12, 0.477, 0.895, 93.2, 14.66],
+            ["MoE Transformer (5 experts)", 20.32, 27.18, 0.474, 0.880, 87.2, 14.74],
+            ["MoE Transformer (3 experts)", 20.45, 27.36, 0.467, 0.891, 89.7, 14.76],
+          ],
+        },
+      },
+      {
+        type: "paragraph",
+        text: "The Mixture JSU (3 components) model outperforms both the baseline and the MoE variants on MAE, RMSE, and CRPS. The MoE architecture, despite its potential for regime-specific specialisation, does not improve over the simpler shared-backbone mixture. This suggests that for this dataset and setup, the added complexity of separate experts and gating does not yield a benefit; the mixture head with a shared backbone is sufficient to capture the multi-modal or skewed nature of electricity prices.",
+      },
+      { type: "heading", level: 2, text: "Notebook 10: CRPS, Conformal Prediction, and Ensemble" },
+      {
+        type: "paragraph",
+        text: "Notebook 10 explores three directions: (1) training with CRPS or Pinball loss instead of NLL, (2) conformal prediction for finite-sample coverage guarantees, and (3) ensemble methods (quantile averaging and stacking).",
+      },
+      {
+        type: "table",
+        table: {
+          caption: "CRPS/Conformal/Ensemble comparison (Notebook 10).",
+          headers: ["Approach", "MAE", "PICP"],
+          rows: [
+            ["Quantile avg ensemble", 18.56, 0.958],
+            ["Quantile (Pinball)", 19.91, 0.902],
+            ["Johnson SU (NLL)", 19.98, 0.905],
+            ["Gaussian CRPS", 20.72, 0.834],
+            ["Conformal (Johnson SU)", 22.04, 0.953],
+            ["Stacking (2 models)", 22.20, "—"],
+          ],
+        },
+      },
+      {
+        type: "paragraph",
+        text: "Quantile averaging of the top models from Notebook 8 achieves the best MAE (18.56) and excellent PICP (0.958), demonstrating that combining diverse probabilistic forecasts improves both point accuracy and calibration. Quantile (Pinball) and Johnson SU (NLL) perform similarly on MAE; Johnson SU has slightly better PICP and the lowest CRPS among single models. Gaussian CRPS training underperforms on both MAE and PICP. Conformal prediction achieves the target coverage (PICP 0.953) as expected from its theoretical guarantees, but at the cost of wider intervals and higher MAE. Notebook 11 (Rolling Retrain vs. Finetune) is still running; results will be reported in a future update.",
+      },
+      { type: "heading", level: 2, text: "Quantile vs. Johnson SU Head: Notebook 6 vs. Notebook 4" },
+      {
+        type: "paragraph",
+        text: "In Notebook 6, the Transformer with a quantile head achieves MAE 20.96, slightly better than the Transformer with a Johnson SU head (MAE 21.75). In contrast, Notebook 4 finds that Johnson SU mixture heads dominate the top rankings, while quantile heads rank below them.",
+      },
+      {
+        type: "paragraph",
+        text: "This apparent contradiction can be explained by the different optimisation setups:",
+      },
+      {
+        type: "orderedList",
+        items: [
+          "Notebook 4 uses fixed, canonical hyperparameters for all head types. The hyperparameters were originally tuned for a Gaussian or standard output head. Under these fixed settings, the Johnson SU and mixture heads perform better because they are better suited to the skewed, heavy-tailed price distribution without requiring head-specific tuning.",
+          "Notebook 6 uses Optuna to optimise each model independently. The quantile head and the Johnson SU head each receive their own hyperparameter search. Optuna may have found a configuration that suits the quantile head particularly well (e.g. different learning rate, number of quantiles, or architecture choices), whereas the Johnson SU head may not have been optimised as effectively within the same search budget.",
+        ],
+      },
+      {
+        type: "paragraph",
+        text: "In other words, the quantile head can benefit from head-specific hyperparameters that Optuna discovers when optimising for it directly. When all heads share the same hyperparameters (Notebook 4), the distributional heads (Johnson SU, mixtures) perform better because they match the price distribution more naturally. The takeaway is that fair comparison requires either (a) optimising each head type separately, or (b) using a common hyperparameter set; the current discrepancy reflects the difference between these two protocols.",
+      },
+      { type: "heading", level: 2, text: "Literature Review and Thesis Writing" },
+      {
+        type: "paragraph",
+        text: "I have incorporated the feedback from Stefano and Chris into my literature study. Their suggestions have helped refine the structure and emphasis of the related work, particularly regarding the positioning of probabilistic forecasting methods and the role of Transformers in time series.",
+      },
+      {
+        type: "paragraph",
+        text: "I have also started writing the first chapter of my thesis, which focuses on the data analysis of the Belgian electricity market. This chapter will draw on the exploratory data analysis from Notebook 1 (and the corresponding visualisations now available in the data visualisation dashboard), including the price distribution, temporal patterns, volatility by hour, cross-border flows, and the impact of renewable generation. The goal is to establish the characteristics of the data that motivate the modelling choices in the subsequent chapters.",
+      },
+      { type: "heading", level: 2, text: "Next Steps" },
+      {
+        type: "list",
+        items: [
+          "Complete and analyse the results of Notebook 11 (Rolling Retrain vs. Finetune).",
+          "Continue writing the first chapter (data analysis) and integrate feedback.",
+          "Consider a unified hyperparameter optimisation across head types to resolve the quantile vs. Johnson SU comparison more rigorously.",
+        ],
+      },
+    ],
+  }
 ];

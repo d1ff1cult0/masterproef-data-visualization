@@ -10,9 +10,19 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
+  ScatterChart,
+  Scatter,
+  ZAxis,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
+  Legend,
 } from "recharts";
 import type { SelectedModel, MetricsResponse, RunMetrics } from "@/lib/types";
 import { METRIC_LABELS, KEY_METRICS } from "@/lib/types";
+import { pairedTTest } from "@/lib/stats";
 
 interface MetricsViewProps {
   selectedModels: SelectedModel[];
@@ -26,11 +36,14 @@ interface ModelMetrics {
   runs: RunMetrics[];
 }
 
+const SCATTER_METRIC_OPTIONS = ["MAE", "RMSE", "CRPS", "PICP", "R2", "IntervalScore"];
+
 export default function MetricsView({ selectedModels }: MetricsViewProps) {
   const [modelMetrics, setModelMetrics] = useState<ModelMetrics[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedMetrics, setSelectedMetrics] = useState<string[]>(KEY_METRICS);
   const [showAllMetrics, setShowAllMetrics] = useState(false);
+  const [scatterMetric, setScatterMetric] = useState<string>("MAE");
 
   useEffect(() => {
     if (selectedModels.length === 0) return;
@@ -64,6 +77,79 @@ export default function MetricsView({ selectedModels }: MetricsViewProps) {
   }, [modelMetrics]);
 
   const displayMetrics = showAllMetrics ? allMetricKeys : selectedMetrics;
+
+  const scatterData = useMemo(() => {
+    return modelMetrics.map((m) => {
+      const trainTime = m.summary?.avg?.training_time ?? m.runs[0]?.training_time ?? 0;
+      const metricVal = m.summary?.avg?.[scatterMetric] ?? m.runs[0]?.[scatterMetric] ?? 0;
+      return {
+        name: m.label,
+        x: trainTime,
+        y: metricVal,
+        fill: m.color,
+      };
+    });
+  }, [modelMetrics, scatterMetric]);
+
+  const radarMetrics = useMemo(() => {
+    return KEY_METRICS.filter((k) =>
+      modelMetrics.some((m) => (m.summary?.avg?.[k] ?? m.runs[0]?.[k]) != null)
+    );
+  }, [modelMetrics]);
+
+  const radarData = useMemo(() => {
+    if (radarMetrics.length === 0) return [];
+    const maxByMetric: Record<string, number> = {};
+    const minByMetric: Record<string, number> = {};
+    for (const k of radarMetrics) {
+      const meta = METRIC_LABELS[k];
+      const vals = modelMetrics
+        .map((m) => m.summary?.avg?.[k] ?? m.runs[0]?.[k])
+        .filter((v): v is number => v != null);
+      if (vals.length === 0) continue;
+      maxByMetric[k] = Math.max(...vals);
+      minByMetric[k] = Math.min(...vals);
+    }
+    return radarMetrics.map((metric) => {
+      const meta = METRIC_LABELS[metric];
+      const obj: Record<string, string | number> = { metric: meta?.label ?? metric };
+      const max = maxByMetric[metric] ?? 1;
+      const min = minByMetric[metric] ?? 0;
+      const range = Math.max(max - min, 1e-9);
+      modelMetrics.forEach((m, i) => {
+        const v = m.summary?.avg?.[metric] ?? m.runs[0]?.[metric];
+        if (v != null) {
+          obj[`m${i}`] = meta?.lowerBetter ? (max - v) / range : (v - min) / range;
+        }
+      });
+      return obj;
+    });
+  }, [modelMetrics, radarMetrics]);
+
+  const tTestResults = useMemo(() => {
+    const results: { metric: string; modelA: string; modelB: string; result: NonNullable<ReturnType<typeof pairedTTest>> }[] = [];
+    for (let i = 0; i < modelMetrics.length; i++) {
+      for (let j = i + 1; j < modelMetrics.length; j++) {
+        const ma = modelMetrics[i];
+        const mb = modelMetrics[j];
+        for (const metric of KEY_METRICS) {
+          const runsA = ma.runs.map((r) => r[metric]).filter((v) => v != null && !Number.isNaN(v));
+          const runsB = mb.runs.map((r) => r[metric]).filter((v) => v != null && !Number.isNaN(v));
+          const meta = METRIC_LABELS[metric];
+          const res = pairedTTest(runsA, runsB, meta?.lowerBetter ?? true);
+          if (res != null) {
+            results.push({
+              metric,
+              modelA: ma.label,
+              modelB: mb.label,
+              result: res,
+            });
+          }
+        }
+      }
+    }
+    return results;
+  }, [modelMetrics]);
 
   const formatValue = (val: number | null | undefined, metric: string): string => {
     if (val === null || val === undefined) return "N/A";
@@ -117,6 +203,149 @@ export default function MetricsView({ selectedModels }: MetricsViewProps) {
               {METRIC_LABELS[key]?.label ?? key}
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Radar chart */}
+      {radarData.length > 0 && modelMetrics.length <= 8 && (
+        <div className="border border-zinc-200 rounded-lg p-4 bg-white">
+          <h3 className="text-sm font-medium text-zinc-700 mb-4">
+            Multi-Metric Radar Comparison
+          </h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <RadarChart data={radarData}>
+              <PolarGrid stroke="#e4e4e7" />
+              <PolarAngleAxis
+                dataKey="metric"
+                tick={{ fontSize: 10, fill: "#71717a" }}
+              />
+              <PolarRadiusAxis angle={90} domain={[0, 1]} tick={{ fontSize: 9 }} />
+              {modelMetrics.map((m, i) => (
+                <Radar
+                  key={m.key}
+                  name={m.label}
+                  dataKey={`m${i}`}
+                  stroke={m.color}
+                  fill={m.color}
+                  fillOpacity={0.2}
+                  strokeWidth={1.5}
+                />
+              ))}
+              <Legend />
+            </RadarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Scatter: Training time vs metric */}
+      <div className="border border-zinc-200 rounded-lg p-4 bg-white">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-medium text-zinc-700">
+            Training Time vs Metric
+          </h3>
+          <select
+            value={scatterMetric}
+            onChange={(e) => setScatterMetric(e.target.value)}
+            className="text-xs px-2 py-1.5 rounded border border-zinc-200 bg-white text-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {SCATTER_METRIC_OPTIONS.filter((k) => k in METRIC_LABELS).map((k) => (
+              <option key={k} value={k}>
+                {METRIC_LABELS[k]?.label ?? k} (Y-axis)
+              </option>
+            ))}
+          </select>
+        </div>
+        <ResponsiveContainer width="100%" height={260}>
+          <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
+            <XAxis
+              type="number"
+              dataKey="x"
+              name="Training Time"
+              unit="s"
+              tick={{ fontSize: 10, fill: "#71717a" }}
+              stroke="#d4d4d8"
+            />
+            <YAxis
+              type="number"
+              dataKey="y"
+              name={METRIC_LABELS[scatterMetric]?.label ?? scatterMetric}
+              tick={{ fontSize: 10, fill: "#71717a" }}
+              stroke="#d4d4d8"
+            />
+            <ZAxis type="number" range={[50, 400]} />
+            <Tooltip
+              cursor={{ strokeDasharray: "3 3" }}
+              contentStyle={{
+                fontSize: 11,
+                backgroundColor: "#ffffff",
+                border: "1px solid #e4e4e7",
+                borderRadius: 6,
+              }}
+              formatter={(value, name, props) => {
+                const p = (props as { payload?: { x?: number } })?.payload;
+                if (name === "x") return [p?.x != null ? p.x.toFixed(1) + " s" : String(value), "Training Time"];
+                if (name === "y") return [value != null ? Number(value).toFixed(3) : String(value), METRIC_LABELS[scatterMetric]?.label ?? scatterMetric];
+                return [value, name];
+              }}
+              labelFormatter={(_, payload) => (payload as unknown as { payload?: { name?: string } }[])?.[0]?.payload?.name ?? ""}
+            />
+            {modelMetrics.map((m, i) => (
+              <Scatter
+                key={m.key}
+                name={m.label}
+                data={scatterData.filter((d) => d.name === m.label)}
+                fill={m.color}
+                fillOpacity={0.8}
+              />
+            ))}
+          </ScatterChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Paired t-test results */}
+      {tTestResults.length > 0 && (
+        <div className="border border-zinc-200 rounded-lg p-4 bg-white">
+          <h3 className="text-sm font-medium text-zinc-700 mb-3">
+            Paired t-Test (p &lt; 0.05)
+          </h3>
+          <p className="text-xs text-zinc-500 mb-3">
+            Compares models across runs. Significant difference indicates one model is statistically better.
+          </p>
+          <div className="overflow-x-auto max-h-64 overflow-y-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-zinc-500 border-b border-zinc-200">
+                  <th className="text-left py-2 px-2 font-medium">Metric</th>
+                  <th className="text-left py-2 px-2 font-medium">Model A</th>
+                  <th className="text-left py-2 px-2 font-medium">Model B</th>
+                  <th className="text-right py-2 px-2 font-medium">t</th>
+                  <th className="text-right py-2 px-2 font-medium">df</th>
+                  <th className="text-center py-2 px-2 font-medium">Winner</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tTestResults.map((r, idx) => (
+                  <tr key={idx} className="border-b border-zinc-100 text-zinc-600">
+                    <td className="py-1.5 px-2">{METRIC_LABELS[r.metric]?.label ?? r.metric}</td>
+                    <td className="py-1.5 px-2">{r.modelA}</td>
+                    <td className="py-1.5 px-2">{r.modelB}</td>
+                    <td className="text-right py-1.5 px-2 tabular-nums">{r.result.tStat.toFixed(2)}</td>
+                    <td className="text-right py-1.5 px-2 tabular-nums">{r.result.df}</td>
+                    <td className="text-center py-1.5 px-2">
+                      {r.result.pSignificant ? (
+                        <span className={`font-medium ${r.result.winner === "A" ? "text-blue-600" : r.result.winner === "B" ? "text-emerald-600" : "text-zinc-500"}`}>
+                          {r.result.winner === "A" ? r.modelA : r.result.winner === "B" ? r.modelB : "—"}
+                        </span>
+                      ) : (
+                        <span className="text-zinc-400">No significant diff.</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
