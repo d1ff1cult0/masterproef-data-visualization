@@ -57,6 +57,8 @@ export interface EDAResult {
     weekend: { mean: number; median: number; std: number; min: number; max: number; count: number };
     weekdayHist: { binStart: number; binEnd: number; count: number }[];
     weekendHist: { binStart: number; binEnd: number; count: number }[];
+    weekdayByHour: { hour: number; mean: number }[];
+    weekendByHour: { hour: number; mean: number }[];
   };
   correlations: {
     features: string[];
@@ -72,7 +74,7 @@ export interface EDAResult {
   loadAnalysis: {
     forecastVsActual: { forecast: number; actual: number }[];
     imbalanceHist: { binStart: number; binEnd: number; count: number }[];
-    imbalanceStats: { mean: number; std: number; min: number; max: number; skewness: number; kurtosis: number };
+    imbalanceStats: { mean: number; std: number; min: number; max: number; skewness: number; kurtosis: number; shapiroWilk?: { W: number; pValue: number } };
   };
   renewables: {
     weekly: { week: string; wind: number; solar: number }[];
@@ -195,6 +197,128 @@ function normalInvCDF(p: number): number {
     q = Math.sqrt(-2 * Math.log(1 - p));
     return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
   }
+}
+
+/** Standard normal CDF (Abramowitz & Stegun 26.2.17) */
+function normalCDF(x: number): number {
+  const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741, a4 = -1.453152027, a5 = 1.061405429;
+  const t = 1 / (1 + 0.2316419 * Math.abs(x));
+  const p = 1 - ((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t * Math.exp(-x * x / 2);
+  return x >= 0 ? p : 1 - p;
+}
+
+/** Shapiro-Wilk test for normality. Returns W and p-value. For n>5000, samples 5000 points. */
+function shapiroWilk(values: number[]): { W: number; pValue: number } | null {
+  let x = [...values].sort((a, b) => a - b);
+  if (x.length > 5000) x = sampleArray(x, 5000);
+  const n = x.length;
+  if (n < 3) return null;
+
+  function poly(cc: number[], nord: number, xx: number): number {
+    let ret = cc[0];
+    if (nord > 1) {
+      let p = xx * cc[nord - 1];
+      for (let j = nord - 2; j > 0; j--) p = (p + cc[j]) * xx;
+      ret += p;
+    }
+    return ret;
+  }
+
+  const nn2 = Math.floor(n / 2);
+  const a: number[] = [];
+  const g = [-2.273, 0.459];
+  const c1 = [0, 0.221157, -0.147981, -2.07119, 4.434685, -2.706056];
+  const c2 = [0, 0.042981, -0.293762, -1.752461, 5.682633, -3.582633];
+  const c3 = [0.544, -0.39978, 0.025054, -6.714e-4];
+  const c4 = [1.3822, -0.77857, 0.062767, -0.0020322];
+  const c5 = [-1.5861, -0.31082, -0.083751, 0.0038915];
+  const c6 = [-0.4803, -0.082676, 0.0030302];
+  const small = 1e-19;
+  const an = n;
+  const an25 = an + 0.25;
+
+  let summ2 = 0;
+  for (let i = 1; i <= nn2; i++) {
+    const ai = normalInvCDF((i - 0.375) / an25);
+    a[i] = ai;
+    summ2 += ai * ai;
+  }
+  summ2 *= 2;
+  const ssumm2 = Math.sqrt(summ2);
+  const rsn = 1 / Math.sqrt(an);
+  let a1 = poly(c1, 6, rsn) - a[1] / ssumm2;
+
+  let i1: number;
+  let fac: number;
+  if (n > 5) {
+    i1 = 3;
+    const a2 = -a[2] / ssumm2 + poly(c2, 6, rsn);
+    fac = Math.sqrt((summ2 - 2 * a[1] * a[1] - 2 * a[2] * a[2]) / (1 - 2 * a1 * a1 - 2 * a2 * a2));
+    a[2] = a2;
+  } else {
+    i1 = 2;
+    fac = Math.sqrt((summ2 - 2 * a[1] * a[1]) / (1 - 2 * a1 * a1));
+  }
+  a[1] = a1;
+  for (let i = i1; i <= nn2; i++) a[i] /= -fac;
+
+  const range = x[n - 1] - x[0];
+  if (range < small) return null;
+
+  let sa = -a[1];
+  let sx = x[0] / range;
+  let xx = x[0] / range;
+  for (let i = 1, j = n - 1; i < n; j--) {
+    const xi = x[i] / range;
+    if (xx - xi > small) return null;
+    sx += xi;
+    i++;
+    if (i !== j) sa += (i - j > 0 ? 1 : -1) * a[Math.min(i, j)];
+    xx = xi;
+  }
+
+  sa /= n;
+  sx /= n;
+  let ssa = 0, ssx = 0, sax = 0;
+  for (let i = 0, j = n - 1; i < n; i++, j--) {
+    const asa = (i !== j ? ((i - j > 0 ? 1 : -1) * a[1 + Math.min(i, j)] - sa) : -sa);
+    const xsx = x[i] / range - sx;
+    ssa += asa * asa;
+    ssx += xsx * xsx;
+    sax += asa * xsx;
+  }
+
+  const ssassx = Math.sqrt(ssa * ssx);
+  const w1 = (ssassx - sax) * (ssassx + sax) / (ssa * ssx);
+  const w = 1 - w1;
+
+  let pw: number;
+  if (n === 3) {
+    const stqr = Math.asin(Math.sqrt(0.75));
+    pw = (6 / Math.PI) * (Math.asin(Math.sqrt(w)) - stqr);
+    pw = Math.max(0, pw);
+  } else {
+    const y = Math.log(w1);
+    const xxLog = Math.log(an);
+    let m: number, s: number;
+    if (n <= 11) {
+      const gamma = poly(g, 2, an);
+      if (y >= gamma) {
+        pw = 1e-99;
+      } else {
+        const yTrans = -Math.log(gamma - y);
+        m = poly(c3, 4, an);
+        s = Math.exp(poly(c4, 4, an));
+        pw = 1 - normalCDF((yTrans - m) / s);
+      }
+    } else {
+      m = poly(c5, 4, xxLog);
+      s = Math.exp(poly(c6, 3, xxLog));
+      pw = 1 - normalCDF((y - m) / s);
+    }
+  }
+
+  return { W: w, pValue: Math.max(1e-99, Math.min(1, pw)) };
 }
 
 function histogram(values: number[], bins: number): { binStart: number; binEnd: number; count: number }[] {
@@ -516,17 +640,29 @@ export function computeEDA(): EDAResult {
   }
 
   // Weekend vs Weekday
-  const weekdayPrices = rows.filter(r => r.IsWeekend === 0).map(r => r.Prices);
-  const weekendPrices = rows.filter(r => r.IsWeekend === 1).map(r => r.Prices);
+  const weekdayRows = rows.filter(r => r.IsWeekend === 0);
+  const weekendRows = rows.filter(r => r.IsWeekend === 1);
+  const weekdayPrices = weekdayRows.map(r => r.Prices);
+  const weekendPrices = weekendRows.map(r => r.Prices);
   const wdStats = statsForGroup(weekdayPrices);
   const weStats = statsForGroup(weekendPrices);
-  const allPricesMin = sortedPrices[0];
-  const allPricesMax = sortedPrices[sortedPrices.length - 1];
+  const histRangeMin = quantile(sortedPrices, 0.02);
+  const histRangeMax = quantile(sortedPrices, 0.98);
+  const weekdayByHour = Array.from({ length: 24 }, (_, h) => {
+    const p = weekdayRows.filter(r => r.Hour === h).map(r => r.Prices);
+    return { hour: h, mean: p.length > 0 ? round(mean(p)) : 0 };
+  });
+  const weekendByHour = Array.from({ length: 24 }, (_, h) => {
+    const p = weekendRows.filter(r => r.Hour === h).map(r => r.Prices);
+    return { hour: h, mean: p.length > 0 ? round(mean(p)) : 0 };
+  });
   const weekendWeekday = {
     weekday: { mean: round(wdStats.mean), median: round(wdStats.median), std: round(wdStats.std), min: round(wdStats.min), max: round(wdStats.max), count: weekdayPrices.length },
     weekend: { mean: round(weStats.mean), median: round(weStats.median), std: round(weStats.std), min: round(weStats.min), max: round(weStats.max), count: weekendPrices.length },
-    weekdayHist: histogramFixed(weekdayPrices, 40, allPricesMin, allPricesMax),
-    weekendHist: histogramFixed(weekendPrices, 40, allPricesMin, allPricesMax),
+    weekdayHist: histogramFixed(weekdayPrices, 40, histRangeMin, histRangeMax),
+    weekendHist: histogramFixed(weekendPrices, 40, histRangeMin, histRangeMax),
+    weekdayByHour,
+    weekendByHour,
   };
 
   // Correlations
@@ -579,10 +715,12 @@ export function computeEDA(): EDAResult {
       const vals = rows.map(r => r.BE_Load_Imbalance);
       const m = mean(vals);
       const s = stddev(vals, m);
+      const sw = shapiroWilk(vals);
       return {
         mean: round(m), std: round(s),
         min: round(Math.min(...vals)), max: round(Math.max(...vals)),
         skewness: round(skewness(vals, m, s)), kurtosis: round(kurtosis(vals, m, s)),
+        shapiroWilk: sw ? { W: round(sw.W), pValue: sw.pValue } : undefined,
       };
     })(),
   };
@@ -631,7 +769,7 @@ export function computeEDA(): EDAResult {
 
   const autocorrelationResult = {
     acf,
-    priceChangesHist: histogram(priceChanges, 60),
+    priceChangesHist: histogram(priceChanges, 120),
     priceChangeStats: {
       mean: round(pcMean),
       std: round(pcStd),

@@ -20,6 +20,7 @@ import {
   Cell,
 } from "recharts";
 import type { EDAResult, SummaryStatRow } from "@/lib/eda";
+import { ZoomableTimeSeriesChart } from "./ZoomableTimeSeriesChart";
 
 // ──────────────────── Color Utilities ────────────────────
 
@@ -256,29 +257,25 @@ export default function EDAView() {
         <div className="space-y-6">
           <div>
             <h4 className="text-xs font-medium text-zinc-600 mb-2">Daily Average Price with Rolling Mean & Std Band</h4>
-            <ResponsiveContainer width="100%" height={350}>
-              <ComposedChart data={data.priceSeries}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v: string) => v.slice(5)} interval={Math.floor(data.priceSeries.length / 12)} />
-                <YAxis tick={{ fontSize: 10 }} label={{ value: "EUR/MWh", angle: -90, position: "insideLeft", style: { fontSize: 10 } }} />
-                <Tooltip contentStyle={{ fontSize: 11 }} />
-                <Line dataKey="avg" stroke={COLORS.primary} strokeWidth={1} dot={false} opacity={0.4} name="Daily Avg" />
-                <Line dataKey="rollingMean" stroke={COLORS.secondary} strokeWidth={2} dot={false} name="7d Rolling Mean" />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-              </ComposedChart>
-            </ResponsiveContainer>
+            <ZoomableTimeSeriesChart data={data.priceSeries} xDataKey="date" height={350} formatXLabel={(v) => v.slice(5)}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v: string) => v.slice(5)} interval={Math.floor(data.priceSeries.length / 12)} />
+              <YAxis tick={{ fontSize: 10 }} label={{ value: "EUR/MWh", angle: -90, position: "insideLeft", style: { fontSize: 10 } }} />
+              <Tooltip contentStyle={{ fontSize: 11 }} />
+              <Line dataKey="avg" stroke={COLORS.primary} strokeWidth={1} dot={false} opacity={0.4} name="Daily Avg" />
+              <Line dataKey="rollingMean" stroke={COLORS.secondary} strokeWidth={2} dot={false} name="7d Rolling Mean" />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+            </ZoomableTimeSeriesChart>
           </div>
           <div>
             <h4 className="text-xs font-medium text-zinc-600 mb-2">7-Day Rolling Standard Deviation</h4>
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={data.priceSeries}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v: string) => v.slice(5)} interval={Math.floor(data.priceSeries.length / 12)} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip contentStyle={{ fontSize: 11 }} />
-                <Line dataKey="rollingStd" stroke={COLORS.orange} strokeWidth={1.5} dot={false} name="7d Rolling Std" />
-              </LineChart>
-            </ResponsiveContainer>
+            <ZoomableTimeSeriesChart data={data.priceSeries} xDataKey="date" height={200} chartType="LineChart" formatXLabel={(v) => v.slice(5)}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v: string) => v.slice(5)} interval={Math.floor(data.priceSeries.length / 12)} />
+              <YAxis tick={{ fontSize: 10 }} />
+              <Tooltip contentStyle={{ fontSize: 11 }} />
+              <Line dataKey="rollingStd" stroke={COLORS.orange} strokeWidth={1.5} dot={false} name="7d Rolling Std" />
+            </ZoomableTimeSeriesChart>
           </div>
           <div>
             <h4 className="text-xs font-medium text-zinc-600 mb-2">Monthly Average Prices</h4>
@@ -406,11 +403,11 @@ export default function EDAView() {
             <div>
               <h4 className="text-xs font-medium text-zinc-600 mb-2">Negative Prices Timeline</h4>
               <ResponsiveContainer width="100%" height={200}>
-                <ScatterChart>
+                <ScatterChart margin={{ top: 10, right: 10, bottom: 30, left: 50 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={(v: string) => v.slice(0, 10)} />
-                  <YAxis tick={{ fontSize: 10 }} label={{ value: "EUR/MWh", angle: -90, position: "insideLeft", style: { fontSize: 10 } }} />
-                  <Tooltip contentStyle={{ fontSize: 11 }} labelFormatter={(v) => String(v)} />
+                  <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={(v: string) => String(v).slice(0, 10)} />
+                  <YAxis dataKey="price" type="number" tick={{ fontSize: 10 }} label={{ value: "EUR/MWh", angle: -90, position: "insideLeft", style: { fontSize: 10 } }} />
+                  <Tooltip contentStyle={{ fontSize: 11 }} formatter={(value: unknown) => [`${Number(value ?? 0)} EUR/MWh`, "Price"]} labelFormatter={(v) => String(v)} />
                   <ReferenceLine y={0} stroke="#dc2626" strokeDasharray="4 4" />
                   <Scatter data={data.negativePrices.timeline} fill={COLORS.secondary} fillOpacity={0.6} r={3} />
                 </ScatterChart>
@@ -451,14 +448,20 @@ export default function EDAView() {
         <div className="space-y-6">
           <div>
             <h4 className="text-xs font-medium text-zinc-600 mb-2">Average Price by Hour of Day</h4>
+            <p className="text-xs text-zinc-400 mb-2">The shaded band shows the interquartile range (IQR): 25th–75th percentile of prices at each hour.</p>
             <ResponsiveContainer width="100%" height={280}>
-              <ComposedChart data={data.temporalPatterns.hourly}>
+              <ComposedChart
+                data={data.temporalPatterns.hourly.map((h) => ({
+                  ...h,
+                  iqrHeight: h.q75 - h.q25,
+                }))}
+              >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="hour" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} label={{ value: "EUR/MWh", angle: -90, position: "insideLeft", style: { fontSize: 10 } }} />
                 <Tooltip contentStyle={{ fontSize: 11 }} />
-                <Area dataKey="q75" stackId="iqr" fill="transparent" stroke="transparent" />
-                <Area dataKey="q25" stackId="iqr" fill={COLORS.primary} fillOpacity={0.1} stroke="transparent" />
+                <Area dataKey="q25" stackId="iqr" fill="transparent" stroke="transparent" />
+                <Area dataKey="iqrHeight" stackId="iqr" fill={COLORS.primary} fillOpacity={0.15} stroke="transparent" name="IQR (25th–75th %)" />
                 <Line dataKey="mean" stroke={COLORS.primary} strokeWidth={2} dot={{ r: 3 }} name="Mean" />
                 <Line dataKey="median" stroke={COLORS.secondary} strokeWidth={1.5} strokeDasharray="4 4" dot={false} name="Median" />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
@@ -502,7 +505,9 @@ export default function EDAView() {
           {/* Peak vs Off-Peak */}
           <div>
             <h4 className="text-xs font-medium text-zinc-600 mb-2">Peak vs Off-Peak Comparison</h4>
-            <p className="text-xs text-zinc-400 mb-3">Peak = weekday 08:00-20:00, Off-Peak = all other hours</p>
+            <p className="text-xs text-zinc-400 mb-3">
+              Price peaks occur at ~5–7 (morning) and 16–20 (evening). The split below uses the conventional definition: Peak = weekday 08:00–20:00, Off-Peak = all other hours.
+            </p>
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-amber-50/50 rounded-lg p-3 border border-amber-100">
                 <div className="text-xs font-semibold text-amber-800 mb-2">Peak Hours ({data.peakOffPeak.peak.count.toLocaleString()} obs)</div>
@@ -580,17 +585,50 @@ export default function EDAView() {
             </div>
           </div>
           <div>
-            <h4 className="text-xs font-medium text-zinc-600 mb-2">Overlapping Price Histograms</h4>
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={mergeHistograms(data.weekendWeekday.weekdayHist, data.weekendWeekday.weekendHist)}>
+            <h4 className="text-xs font-medium text-zinc-600 mb-2">Price Distribution (Normalized)</h4>
+            <p className="text-xs text-zinc-400 mb-2">
+              Proportion of observations in each price bin (2nd–98th percentile range). Normalized so weekday and weekend are directly comparable.
+            </p>
+            <ResponsiveContainer width="100%" height={260}>
+              <ComposedChart
+                data={mergeHistograms(
+                  data.weekendWeekday.weekdayHist,
+                  data.weekendWeekday.weekendHist,
+                  data.weekendWeekday.weekday.count,
+                  data.weekendWeekday.weekend.count
+                )}
+              >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="binStart" tick={{ fontSize: 9 }} tickFormatter={(v: number) => v.toFixed(0)} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip contentStyle={{ fontSize: 11 }} />
-                <Bar dataKey="weekday" fill={COLORS.primary} fillOpacity={0.5} name="Weekday" />
-                <Bar dataKey="weekend" fill={COLORS.orange} fillOpacity={0.5} name="Weekend" />
+                <XAxis dataKey="binMid" tick={{ fontSize: 9 }} tickFormatter={(v: number) => v.toFixed(0)} label={{ value: "Price (EUR/MWh)", position: "insideBottom", offset: -5, style: { fontSize: 10 } }} />
+                <YAxis tick={{ fontSize: 10 }} label={{ value: "Proportion", angle: -90, position: "insideLeft", style: { fontSize: 10 } }} />
+                <Tooltip contentStyle={{ fontSize: 11 }} formatter={(v: unknown, name?: unknown) => [(Number(v ?? 0) * 100).toFixed(2) + "%", String(name ?? "")]} labelFormatter={(v) => `€${Number(v).toFixed(0)}/MWh`} />
+                <Bar dataKey="weekday" fill={COLORS.primary} fillOpacity={0.5} name="Weekday" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="weekend" fill={COLORS.orange} fillOpacity={0.5} name="Weekend" radius={[2, 2, 0, 0]} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-              </BarChart>
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+          <div>
+            <h4 className="text-xs font-medium text-zinc-600 mb-2">Mean Price by Hour: Weekday vs Weekend</h4>
+            <p className="text-xs text-zinc-400 mb-2">
+              Average price at each hour of the day. Weekends typically show lower peaks and less volatility.
+            </p>
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart
+                data={data.weekendWeekday.weekdayByHour.map((wd, i) => ({
+                  hour: wd.hour,
+                  Weekday: wd.mean,
+                  Weekend: data.weekendWeekday.weekendByHour[i]?.mean ?? 0,
+                }))}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="hour" tick={{ fontSize: 10 }} tickFormatter={(v) => `${v}:00`} />
+                <YAxis tick={{ fontSize: 10 }} label={{ value: "EUR/MWh", angle: -90, position: "insideLeft", style: { fontSize: 10 } }} />
+                <Tooltip contentStyle={{ fontSize: 11 }} labelFormatter={(v) => `${v}:00`} />
+                <Line type="monotone" dataKey="Weekday" stroke={COLORS.primary} strokeWidth={2} dot={{ r: 3 }} name="Weekday" />
+                <Line type="monotone" dataKey="Weekend" stroke={COLORS.orange} strokeWidth={2} dot={{ r: 3 }} name="Weekend" />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+              </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
@@ -622,21 +660,44 @@ export default function EDAView() {
           </div>
           <div>
             <h4 className="text-xs font-medium text-zinc-600 mb-2">Scatter Plots vs Prices (top 4 correlated)</h4>
+            <p className="text-xs text-zinc-400 mb-2">Axes use 2nd–98th percentile range to reduce outlier impact. Dashed line = linear regression trend.</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {data.correlations.scatterVsPrices.map(({ feature, points }) => (
-                <div key={feature}>
-                  <p className="text-xs text-zinc-500 mb-1">{feature} vs Prices (r = {data.correlations.withPrices.find(f => f.feature === feature)?.correlation})</p>
-                  <ResponsiveContainer width="100%" height={220}>
-                    <ScatterChart>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis dataKey="x" name={feature} tick={{ fontSize: 9 }} label={{ value: feature, position: "insideBottom", offset: -2, style: { fontSize: 9 } }} />
-                      <YAxis dataKey="y" name="Prices" tick={{ fontSize: 9 }} label={{ value: "Prices", angle: -90, position: "insideLeft", style: { fontSize: 9 } }} />
-                      <Tooltip contentStyle={{ fontSize: 10 }} />
-                      <Scatter data={points} fill={COLORS.primary} fillOpacity={0.3} r={2} />
-                    </ScatterChart>
-                  </ResponsiveContainer>
-                </div>
-              ))}
+              {data.correlations.scatterVsPrices.map(({ feature, points }) => {
+                const xs = points.map((p) => p.x).filter((v) => !Number.isNaN(v));
+                const ys = points.map((p) => p.y).filter((v) => !Number.isNaN(v));
+                const xSorted = [...xs].sort((a, b) => a - b);
+                const ySorted = [...ys].sort((a, b) => a - b);
+                const xMin = percentile(xSorted, 0.02);
+                const xMax = percentile(xSorted, 0.98);
+                const yMin = percentile(ySorted, 0.02);
+                const yMax = percentile(ySorted, 0.98);
+                const { slope, intercept } = linearRegression(points);
+                const trendY1 = slope * xMin + intercept;
+                const trendY2 = slope * xMax + intercept;
+                return (
+                  <div key={feature}>
+                    <p className="text-xs text-zinc-500 mb-1">{feature} vs Prices (r = {data.correlations.withPrices.find((f) => f.feature === feature)?.correlation})</p>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <ScatterChart margin={{ top: 10, right: 10, bottom: 30, left: 50 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis dataKey="x" type="number" domain={[xMin, xMax]} tick={{ fontSize: 9 }} label={{ value: feature, position: "insideBottom", offset: -2, style: { fontSize: 9 } }} />
+                        <YAxis dataKey="y" type="number" domain={[yMin, yMax]} tick={{ fontSize: 9 }} label={{ value: "Prices (EUR/MWh)", angle: -90, position: "insideLeft", style: { fontSize: 9 } }} />
+                        <Tooltip contentStyle={{ fontSize: 10 }} />
+                        <Scatter data={points} fill={COLORS.primary} fillOpacity={0.3} r={2} />
+                        <ReferenceLine
+                          segment={[
+                            { x: xMin, y: trendY1 },
+                            { x: xMax, y: trendY2 },
+                          ]}
+                          stroke={COLORS.secondary}
+                          strokeDasharray="4 4"
+                          strokeWidth={1.5}
+                        />
+                      </ScatterChart>
+                    </ResponsiveContainer>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -647,33 +708,29 @@ export default function EDAView() {
         <div className="space-y-6">
           <div>
             <h4 className="text-xs font-medium text-zinc-600 mb-2">Daily Average Prices: Belgium, France, Netherlands</h4>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={data.crossBorder.daily}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={(v: string) => v.slice(5)} interval={Math.floor(data.crossBorder.daily.length / 10)} />
-                <YAxis tick={{ fontSize: 10 }} label={{ value: "EUR/MWh", angle: -90, position: "insideLeft", style: { fontSize: 10 } }} />
-                <Tooltip contentStyle={{ fontSize: 11 }} />
-                <Line dataKey="BE" stroke={COLORS.primary} strokeWidth={1.5} dot={false} name="Belgium" />
-                <Line dataKey="FR" stroke={COLORS.secondary} strokeWidth={1} dot={false} opacity={0.7} name="France" />
-                <Line dataKey="NL" stroke={COLORS.tertiary} strokeWidth={1} dot={false} opacity={0.7} name="Netherlands" />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-              </LineChart>
-            </ResponsiveContainer>
+            <ZoomableTimeSeriesChart data={data.crossBorder.daily} xDataKey="date" height={300} formatXLabel={(v) => v.slice(5)} chartType="LineChart">
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={(v: string) => v.slice(5)} interval={Math.floor(data.crossBorder.daily.length / 10)} />
+              <YAxis tick={{ fontSize: 10 }} label={{ value: "EUR/MWh", angle: -90, position: "insideLeft", style: { fontSize: 10 } }} />
+              <Tooltip contentStyle={{ fontSize: 11 }} />
+              <Line dataKey="BE" stroke={COLORS.primary} strokeWidth={1.5} dot={false} name="Belgium" />
+              <Line dataKey="FR" stroke={COLORS.secondary} strokeWidth={1} dot={false} opacity={0.7} name="France" />
+              <Line dataKey="NL" stroke={COLORS.tertiary} strokeWidth={1} dot={false} opacity={0.7} name="Netherlands" />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+            </ZoomableTimeSeriesChart>
           </div>
           <div>
             <h4 className="text-xs font-medium text-zinc-600 mb-2">Price Spreads (BE minus neighbor)</h4>
-            <ResponsiveContainer width="100%" height={250}>
-              <ComposedChart data={data.crossBorder.spreads}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={(v: string) => v.slice(5)} interval={Math.floor(data.crossBorder.spreads.length / 10)} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip contentStyle={{ fontSize: 11 }} />
-                <ReferenceLine y={0} stroke="#999" strokeDasharray="3 3" />
-                <Line dataKey="BE_FR" stroke={COLORS.secondary} strokeWidth={1} dot={false} name="BE - FR" opacity={0.7} />
-                <Line dataKey="BE_NL" stroke={COLORS.tertiary} strokeWidth={1} dot={false} name="BE - NL" opacity={0.7} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-              </ComposedChart>
-            </ResponsiveContainer>
+            <ZoomableTimeSeriesChart data={data.crossBorder.spreads} xDataKey="date" height={250} formatXLabel={(v) => v.slice(5)}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={(v: string) => v.slice(5)} interval={Math.floor(data.crossBorder.spreads.length / 10)} />
+              <YAxis tick={{ fontSize: 10 }} />
+              <Tooltip contentStyle={{ fontSize: 11 }} />
+              <ReferenceLine y={0} stroke="#999" strokeDasharray="3 3" />
+              <Line dataKey="BE_FR" stroke={COLORS.secondary} strokeWidth={1} dot={false} name="BE - FR" opacity={0.7} />
+              <Line dataKey="BE_NL" stroke={COLORS.tertiary} strokeWidth={1} dot={false} name="BE - NL" opacity={0.7} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+            </ZoomableTimeSeriesChart>
           </div>
           <div>
             <h4 className="text-xs font-medium text-zinc-600 mb-2">Spread Statistics</h4>
@@ -712,14 +769,38 @@ export default function EDAView() {
               <ResponsiveContainer width="100%" height={300}>
                 <ScatterChart>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="forecast" name="Forecast" tick={{ fontSize: 10 }} label={{ value: "BE Load Forecast (MW)", position: "insideBottom", offset: -2, style: { fontSize: 10 } }} />
-                  <YAxis dataKey="actual" name="Actual" tick={{ fontSize: 10 }} label={{ value: "BE Load Actual (MW)", angle: -90, position: "insideLeft", style: { fontSize: 10 } }} />
+                  <XAxis
+                    dataKey="forecast"
+                    type="number"
+                    domain={(() => {
+                      const vals = data.loadAnalysis.forecastVsActual;
+                      const minV = Math.min(...vals.map((v) => Math.min(v.forecast, v.actual)));
+                      const maxV = Math.max(...vals.map((v) => Math.max(v.forecast, v.actual)));
+                      return [minV, maxV];
+                    })()}
+                    name="Forecast"
+                    tick={{ fontSize: 10 }}
+                    label={{ value: "BE Load Forecast (MW)", position: "insideBottom", offset: -2, style: { fontSize: 10 } }}
+                  />
+                  <YAxis
+                    dataKey="actual"
+                    type="number"
+                    domain={(() => {
+                      const vals = data.loadAnalysis.forecastVsActual;
+                      const minV = Math.min(...vals.map((v) => Math.min(v.forecast, v.actual)));
+                      const maxV = Math.max(...vals.map((v) => Math.max(v.forecast, v.actual)));
+                      return [minV, maxV];
+                    })()}
+                    name="Actual"
+                    tick={{ fontSize: 10 }}
+                    label={{ value: "BE Load Actual (MW)", angle: -90, position: "insideLeft", style: { fontSize: 10 } }}
+                  />
                   <Tooltip contentStyle={{ fontSize: 11 }} />
                   <Scatter data={data.loadAnalysis.forecastVsActual} fill={COLORS.primary} fillOpacity={0.3} r={2} />
                   {(() => {
                     const vals = data.loadAnalysis.forecastVsActual;
-                    const minV = Math.min(...vals.map(v => Math.min(v.forecast, v.actual)));
-                    const maxV = Math.max(...vals.map(v => Math.max(v.forecast, v.actual)));
+                    const minV = Math.min(...vals.map((v) => Math.min(v.forecast, v.actual)));
+                    const maxV = Math.max(...vals.map((v) => Math.max(v.forecast, v.actual)));
                     return <ReferenceLine segment={[{ x: minV, y: minV }, { x: maxV, y: maxV }]} stroke="#ef4444" strokeDasharray="4 4" />;
                   })()}
                 </ScatterChart>
@@ -747,6 +828,23 @@ export default function EDAView() {
               <span><b>Max:</b> {data.loadAnalysis.imbalanceStats.max} MW</span>
               <span><b>Skewness:</b> {data.loadAnalysis.imbalanceStats.skewness}</span>
               <span><b>Kurtosis:</b> {data.loadAnalysis.imbalanceStats.kurtosis}</span>
+              {data.loadAnalysis.imbalanceStats.shapiroWilk && (
+                <>
+                  <span><b>Shapiro–Wilk W:</b> {data.loadAnalysis.imbalanceStats.shapiroWilk.W}</span>
+                  <span>
+                    <b>Shapiro–Wilk p:</b>{" "}
+                    {data.loadAnalysis.imbalanceStats.shapiroWilk.pValue < 0.001
+                      ? "< 0.001"
+                      : data.loadAnalysis.imbalanceStats.shapiroWilk.pValue.toFixed(4)}
+                  </span>
+                  <span>
+                    <b>Normality:</b>{" "}
+                    {data.loadAnalysis.imbalanceStats.shapiroWilk.pValue < 0.05
+                      ? "Rejected (p < 0.05)"
+                      : "Not rejected (p ≥ 0.05)"}
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -756,17 +854,15 @@ export default function EDAView() {
       {S("renewables", "Renewable Energy Forecasts", "Weekly average wind and solar", (
         <div>
           <h4 className="text-xs font-medium text-zinc-600 mb-2">Weekly Average Renewable Forecasts (Belgium)</h4>
-          <ResponsiveContainer width="100%" height={300}>
-            <ComposedChart data={data.renewables.weekly}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="week" tick={{ fontSize: 9 }} interval={Math.floor(data.renewables.weekly.length / 12)} angle={-45} textAnchor="end" height={50} />
-              <YAxis tick={{ fontSize: 10 }} label={{ value: "MW", angle: -90, position: "insideLeft", style: { fontSize: 10 } }} />
-              <Tooltip contentStyle={{ fontSize: 11 }} />
-              <Area dataKey="solar" fill={COLORS.quaternary} fillOpacity={0.3} stroke={COLORS.quaternary} strokeWidth={1.5} name="Solar" />
-              <Line dataKey="wind" stroke={COLORS.cyan} strokeWidth={2} dot={false} name="Wind" />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-            </ComposedChart>
-          </ResponsiveContainer>
+          <ZoomableTimeSeriesChart data={data.renewables.weekly} xDataKey="week" height={300}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <XAxis dataKey="week" tick={{ fontSize: 9 }} interval={Math.floor(data.renewables.weekly.length / 12)} angle={-45} textAnchor="end" height={50} />
+            <YAxis tick={{ fontSize: 10 }} label={{ value: "MW", angle: -90, position: "insideLeft", style: { fontSize: 10 } }} />
+            <Tooltip contentStyle={{ fontSize: 11 }} />
+            <Area dataKey="solar" fill={COLORS.quaternary} fillOpacity={0.3} stroke={COLORS.quaternary} strokeWidth={1.5} name="Solar" />
+            <Line dataKey="wind" stroke={COLORS.cyan} strokeWidth={2} dot={false} name="Wind" />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
+          </ZoomableTimeSeriesChart>
         </div>
       ))}
 
@@ -774,19 +870,17 @@ export default function EDAView() {
       {S("flows", "Cross-border Flows", "Weekly average flows BE-NL, BE-FR, BE-DE", (
         <div>
           <h4 className="text-xs font-medium text-zinc-600 mb-2">Weekly Average Cross-border Flows</h4>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={data.crossBorderFlows.weekly}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="week" tick={{ fontSize: 9 }} interval={Math.floor(data.crossBorderFlows.weekly.length / 12)} angle={-45} textAnchor="end" height={50} />
-              <YAxis tick={{ fontSize: 10 }} label={{ value: "MW", angle: -90, position: "insideLeft", style: { fontSize: 10 } }} />
-              <Tooltip contentStyle={{ fontSize: 11 }} />
-              <ReferenceLine y={0} stroke="#999" strokeDasharray="3 3" />
-              <Line dataKey="BE_NL" stroke={COLORS.primary} strokeWidth={1.5} dot={false} name="BE-NL" />
-              <Line dataKey="BE_FR" stroke={COLORS.secondary} strokeWidth={1.5} dot={false} name="BE-FR" />
-              <Line dataKey="BE_DE" stroke={COLORS.tertiary} strokeWidth={1.5} dot={false} name="BE-DE" />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-            </LineChart>
-          </ResponsiveContainer>
+          <ZoomableTimeSeriesChart data={data.crossBorderFlows.weekly} xDataKey="week" height={300} chartType="LineChart">
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <XAxis dataKey="week" tick={{ fontSize: 9 }} interval={Math.floor(data.crossBorderFlows.weekly.length / 12)} angle={-45} textAnchor="end" height={50} />
+            <YAxis tick={{ fontSize: 10 }} label={{ value: "MW", angle: -90, position: "insideLeft", style: { fontSize: 10 } }} />
+            <Tooltip contentStyle={{ fontSize: 11 }} />
+            <ReferenceLine y={0} stroke="#999" strokeDasharray="3 3" />
+            <Line dataKey="BE_NL" stroke={COLORS.primary} strokeWidth={1.5} dot={false} name="BE-NL" />
+            <Line dataKey="BE_FR" stroke={COLORS.secondary} strokeWidth={1.5} dot={false} name="BE-FR" />
+            <Line dataKey="BE_DE" stroke={COLORS.tertiary} strokeWidth={1.5} dot={false} name="BE-DE" />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
+          </ZoomableTimeSeriesChart>
         </div>
       ))}
 
@@ -906,7 +1000,7 @@ export default function EDAView() {
       {/* ────── 17. Pair Plot ────── */}
       {S("pairplot", "Pair Plot (Key Features)", `Scatter matrix for ${data.pairPlot.features.length} features`, (
         <div>
-          <p className="text-xs text-zinc-500 mb-3">Scatter plots between key features (300 sampled points)</p>
+          <p className="text-xs text-zinc-500 mb-3">Scatter plots between key features (300 sampled points, 2nd–98th percentile domain to reduce outlier impact)</p>
           <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${data.pairPlot.features.length}, 1fr)` }}>
             {data.pairPlot.features.flatMap((fy, yi) =>
               data.pairPlot.features.map((fx, xi) => {
@@ -917,17 +1011,39 @@ export default function EDAView() {
                     </div>
                   );
                 }
-                return (
-                  <div key={`${fx}-${fy}`} className="border border-zinc-100 rounded overflow-hidden">
-                    <ResponsiveContainer width="100%" height={80}>
-                      <ScatterChart margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
-                        <XAxis dataKey={fx} tick={false} />
-                        <YAxis dataKey={fy} tick={false} width={0} />
-                        <Scatter data={data.pairPlot.data} fill={COLORS.primary} fillOpacity={0.2} r={1} />
-                      </ScatterChart>
-                    </ResponsiveContainer>
-                  </div>
-                );
+                {(() => {
+                  const PRICE_FEATURES = ["Prices", "FR_Prices", "NL_Prices"];
+                  const xVals = data.pairPlot.data.map((d) => Number(d[fx])).filter((v) => !Number.isNaN(v));
+                  const yVals = data.pairPlot.data.map((d) => Number(d[fy])).filter((v) => !Number.isNaN(v));
+                  const p = (arr: number[], q: number) => {
+                    if (arr.length === 0) return 0;
+                    const sorted = [...arr].sort((a, b) => a - b);
+                    const idx = (q / 100) * (sorted.length - 1);
+                    const lo = Math.floor(idx);
+                    const hi = Math.ceil(idx);
+                    return lo === hi ? sorted[lo] : sorted[lo] + (idx - lo) * (sorted[hi] - sorted[lo]);
+                  };
+                  const xLo = p(xVals, 2);
+                  const xHi = p(xVals, 98);
+                  const yLo = p(yVals, 2);
+                  const yHi = p(yVals, 98);
+                  const useSameScale = PRICE_FEATURES.includes(fx) && PRICE_FEATURES.includes(fy);
+                  const lo = useSameScale ? Math.min(xLo, yLo) : xLo;
+                  const hi = useSameScale ? Math.max(xHi, yHi) : xHi;
+                  const xDomain = xLo === xHi ? [xLo - 0.5, xHi + 0.5] : [lo, hi];
+                  const yDomain = yLo === yHi ? [yLo - 0.5, yHi + 0.5] : (useSameScale ? [lo, hi] : [yLo, yHi]);
+                  return (
+                    <div key={`${fx}-${fy}`} className="border border-zinc-100 rounded overflow-hidden">
+                      <ResponsiveContainer width="100%" height={80}>
+                        <ScatterChart margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
+                          <XAxis dataKey={fx} type="number" domain={xDomain} tick={false} />
+                          <YAxis dataKey={fy} type="number" domain={yDomain} tick={false} width={0} />
+                          <Scatter data={data.pairPlot.data} fill={COLORS.primary} fillOpacity={0.3} r={2} />
+                        </ScatterChart>
+                      </ResponsiveContainer>
+                    </div>
+                  );
+                })()}
               })
             )}
           </div>
@@ -944,18 +1060,16 @@ export default function EDAView() {
         <div className="space-y-6">
           <div>
             <h4 className="text-xs font-medium text-zinc-600 mb-2">14-Day Rolling Volatility (Std Dev of Daily Returns)</h4>
-            <ResponsiveContainer width="100%" height={280}>
-              <ComposedChart data={data.volatility.daily}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={(v: string) => v.slice(5)} interval={Math.floor(data.volatility.daily.length / 10)} />
-                <YAxis yAxisId="vol" tick={{ fontSize: 10 }} label={{ value: "Volatility", angle: -90, position: "insideLeft", style: { fontSize: 10 } }} />
-                <YAxis yAxisId="price" orientation="right" tick={{ fontSize: 10 }} label={{ value: "EUR/MWh", angle: 90, position: "insideRight", style: { fontSize: 10 } }} />
-                <Tooltip contentStyle={{ fontSize: 11 }} />
-                <Line yAxisId="price" dataKey="price" stroke={COLORS.primary} strokeWidth={1} dot={false} opacity={0.3} name="Avg Price" />
-                <Area yAxisId="vol" dataKey="volatility" fill={COLORS.secondary} fillOpacity={0.15} stroke={COLORS.secondary} strokeWidth={1.5} name="Volatility" />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-              </ComposedChart>
-            </ResponsiveContainer>
+            <ZoomableTimeSeriesChart data={data.volatility.daily} xDataKey="date" height={280} formatXLabel={(v) => v.slice(5)}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={(v: string) => v.slice(5)} interval={Math.floor(data.volatility.daily.length / 10)} />
+              <YAxis yAxisId="vol" tick={{ fontSize: 10 }} label={{ value: "Volatility", angle: -90, position: "insideLeft", style: { fontSize: 10 } }} />
+              <YAxis yAxisId="price" orientation="right" tick={{ fontSize: 10 }} label={{ value: "EUR/MWh", angle: 90, position: "insideRight", style: { fontSize: 10 } }} />
+              <Tooltip contentStyle={{ fontSize: 11 }} />
+              <Line yAxisId="price" dataKey="price" stroke={COLORS.primary} strokeWidth={1} dot={false} opacity={0.3} name="Avg Price" />
+              <Area yAxisId="vol" dataKey="volatility" fill={COLORS.secondary} fillOpacity={0.15} stroke={COLORS.secondary} strokeWidth={1.5} name="Volatility" />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+            </ZoomableTimeSeriesChart>
           </div>
           <div>
             <h4 className="text-xs font-medium text-zinc-600 mb-2">Monthly Volatility</h4>
@@ -973,7 +1087,7 @@ export default function EDAView() {
       ))}
 
       {/* ────── 19. Year-over-Year ────── */}
-      {S("yoy", "Year-over-Year Comparison", `${data.yearOverYear.years.join(", ")}`, (
+      {S("yoy", "Year-over-Year Comparison", `${data.yearOverYear.years.filter((y) => y !== 2026).join(", ")}`, (
         <div>
           <h4 className="text-xs font-medium text-zinc-600 mb-2">Monthly Average Prices by Year</h4>
           <ResponsiveContainer width="100%" height={300}>
@@ -982,9 +1096,11 @@ export default function EDAView() {
               <XAxis dataKey="monthName" tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 10 }} label={{ value: "EUR/MWh", angle: -90, position: "insideLeft", style: { fontSize: 10 } }} />
               <Tooltip contentStyle={{ fontSize: 11 }} />
-              {data.yearOverYear.years.map((year, i) => (
-                <Bar key={year} dataKey={(entry: EDAResult["yearOverYear"]["monthlyByYear"][0]) => entry.values.find(v => v.year === year)?.avg ?? 0} name={String(year)} fill={Object.values(COLORS)[i % Object.values(COLORS).length]} fillOpacity={0.7} radius={[2, 2, 0, 0]} />
-              ))}
+              {data.yearOverYear.years
+                .filter((year) => year !== 2026)
+                .map((year, i) => (
+                  <Bar key={year} dataKey={(entry: EDAResult["yearOverYear"]["monthlyByYear"][0]) => entry.values.find(v => v.year === year)?.avg ?? 0} name={String(year)} fill={Object.values(COLORS)[i % Object.values(COLORS).length]} fillOpacity={0.7} radius={[2, 2, 0, 0]} />
+                ))}
               <Legend wrapperStyle={{ fontSize: 11 }} />
             </BarChart>
           </ResponsiveContainer>
@@ -1009,14 +1125,39 @@ function fmt(v: number): string {
   return v.toFixed(4);
 }
 
+function percentile(sorted: number[], q: number): number {
+  if (sorted.length === 0) return 0;
+  const pos = q * (sorted.length - 1);
+  const lo = Math.floor(pos);
+  const hi = Math.ceil(pos);
+  if (lo === hi) return sorted[lo];
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
+}
+
+function linearRegression(points: { x: number; y: number }[]): { slope: number; intercept: number } {
+  const n = points.length;
+  if (n < 2) return { slope: 0, intercept: 0 };
+  const sumX = points.reduce((s, p) => s + p.x, 0);
+  const sumY = points.reduce((s, p) => s + p.y, 0);
+  const sumXY = points.reduce((s, p) => s + p.x * p.y, 0);
+  const sumXX = points.reduce((s, p) => s + p.x * p.x, 0);
+  const denom = n * sumXX - sumX * sumX;
+  const slope = denom !== 0 ? (n * sumXY - sumX * sumY) / denom : 0;
+  const intercept = (sumY - slope * sumX) / n;
+  return { slope, intercept };
+}
+
 function mergeHistograms(
   a: { binStart: number; binEnd: number; count: number }[],
-  b: { binStart: number; binEnd: number; count: number }[]
-): { binStart: number; weekday: number; weekend: number }[] {
+  b: { binStart: number; binEnd: number; count: number }[],
+  totalA: number,
+  totalB: number
+): { binStart: number; binMid: number; weekday: number; weekend: number }[] {
   return a.map((item, i) => ({
     binStart: item.binStart,
-    weekday: item.count,
-    weekend: b[i]?.count ?? 0,
+    binMid: (item.binStart + item.binEnd) / 2,
+    weekday: totalA > 0 ? item.count / totalA : 0,
+    weekend: totalB > 0 ? (b[i]?.count ?? 0) / totalB : 0,
   }));
 }
 
@@ -1100,8 +1241,8 @@ function CorrelationMatrix({ features, matrix }: { features: string[]; matrix: n
         <div className="flex">
           <div className="w-36" />
           {features.map((f) => (
-            <div key={f} className="w-10 text-center">
-              <span className="text-[8px] text-zinc-500 writing-mode-vertical inline-block transform -rotate-60 origin-bottom-left whitespace-nowrap" style={{ writingMode: "vertical-rl", transform: "rotate(180deg)", height: 80 }}>
+            <div key={f} className="w-10 text-center flex items-end justify-center" style={{ height: 80 }}>
+              <span className="text-[8px] text-zinc-500 whitespace-nowrap" style={{ transform: "rotate(45deg)", transformOrigin: "bottom center" }}>
                 {f.replace(/_/g, " ")}
               </span>
             </div>

@@ -8,9 +8,9 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
   ReferenceArea,
 } from "recharts";
+import { ZoomableTimeSeriesChart } from "./ZoomableTimeSeriesChart";
 import { METHODOLOGY } from "@/lib/methodology";
 
 const TRAIN_COLOR = "#2563eb";
@@ -103,71 +103,78 @@ export default function MethodologySection() {
               Loading price data…
             </div>
           ) : priceSeries.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart
-                data={priceSeries}
-                margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
-                <XAxis
-                  dataKey="date"
-                  type="category"
-                  tick={{ fontSize: 10, fill: "#71717a" }}
-                  tickFormatter={(v) =>
-                    new Date(v + "T00:00:00Z").toLocaleDateString("en-GB", {
-                      month: "short",
-                      year: "2-digit",
-                    })
-                  }
-                />
-                <YAxis
-                  tick={{ fontSize: 10, fill: "#71717a" }}
-                  tickFormatter={(v) => `${v}`}
-                />
-                <Tooltip
-                  contentStyle={{
-                    fontSize: 11,
-                    backgroundColor: "#ffffff",
-                    border: "1px solid #e4e4e7",
-                    borderRadius: 6,
-                  }}
-                  labelFormatter={(label) =>
-                    new Date(label + "T00:00:00Z").toLocaleDateString("en-GB", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })
-                  }
-                  formatter={(value: unknown) => [`€${Number(value ?? 0).toFixed(2)}`, "Daily avg"]}
-                />
-                <ReferenceArea
-                  x1={dataSplit.trainStart}
-                  x2={dataSplit.trainEnd}
-                  fill={TRAIN_COLOR}
-                  fillOpacity={0.2}
-                />
-                <ReferenceArea
-                  x1={dataSplit.valStart}
-                  x2={dataSplit.valEnd}
-                  fill={VAL_COLOR}
-                  fillOpacity={0.2}
-                />
-                <ReferenceArea
-                  x1={dataSplit.testStart}
-                  x2={dataSplit.testEnd}
-                  fill={TEST_COLOR}
-                  fillOpacity={0.2}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="price"
-                  stroke="#18181b"
-                  strokeWidth={1.5}
-                  dot={false}
-                  connectNulls
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            <ZoomableTimeSeriesChart
+              data={priceSeries}
+              xDataKey="date"
+              height={220}
+              margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
+              chartType="LineChart"
+              formatXLabel={(v) =>
+                new Date(v + "T00:00:00Z").toLocaleDateString("en-GB", {
+                  month: "short",
+                  year: "2-digit",
+                })
+              }
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
+              <XAxis
+                dataKey="date"
+                type="category"
+                tick={{ fontSize: 10, fill: "#71717a" }}
+                tickFormatter={(v) =>
+                  new Date(v + "T00:00:00Z").toLocaleDateString("en-GB", {
+                    month: "short",
+                    year: "2-digit",
+                  })
+                }
+              />
+              <YAxis
+                tick={{ fontSize: 10, fill: "#71717a" }}
+                tickFormatter={(v) => `${v}`}
+              />
+              <Tooltip
+                contentStyle={{
+                  fontSize: 11,
+                  backgroundColor: "#ffffff",
+                  border: "1px solid #e4e4e7",
+                  borderRadius: 6,
+                }}
+                labelFormatter={(label) =>
+                  new Date(label + "T00:00:00Z").toLocaleDateString("en-GB", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })
+                }
+                formatter={(value: unknown) => [`€${Number(value ?? 0).toFixed(2)}`, "Daily avg"]}
+              />
+              <ReferenceArea
+                x1={dataSplit.trainStart}
+                x2={dataSplit.trainEnd}
+                fill={TRAIN_COLOR}
+                fillOpacity={0.2}
+              />
+              <ReferenceArea
+                x1={dataSplit.valStart}
+                x2={dataSplit.valEnd}
+                fill={VAL_COLOR}
+                fillOpacity={0.2}
+              />
+              <ReferenceArea
+                x1={dataSplit.testStart}
+                x2={dataSplit.testEnd}
+                fill={TEST_COLOR}
+                fillOpacity={0.2}
+              />
+              <Line
+                type="monotone"
+                dataKey="price"
+                stroke="#18181b"
+                strokeWidth={1.5}
+                dot={false}
+                connectNulls
+              />
+            </ZoomableTimeSeriesChart>
           ) : (
             <div className="relative h-10 bg-zinc-100 rounded overflow-hidden">
               {segments.map((seg) => (
