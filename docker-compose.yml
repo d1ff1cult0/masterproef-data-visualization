@@ -3,6 +3,9 @@ services:
     build: .
     ports:
       - "3005:3005"
+    environment:
+      - DATASET_PATH=/home/d1ff1cult/masterproef_new/data/datasets/BE_ENTSOE.csv
     volumes:
       - /home/d1ff1cult/masterproef_new/results:/home/d1ff1cult/masterproef_new/results:ro
+      - /home/d1ff1cult/masterproef_new/data:/home/d1ff1cult/masterproef_new/data:ro
     restart: unless-stopped

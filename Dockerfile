@@ -20,6 +20,7 @@ FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV RESULTS_DIR=/home/d1ff1cult/masterproef_new/results
+ENV DATASET_PATH=/home/d1ff1cult/masterproef_new/data/datasets/BE_ENTSOE.csv
 ENV PORT=3005
 ENV HOSTNAME=0.0.0.0
 

@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import type { Experiment, ModelInfo, ModelSummary, RunMetrics } from "./types";
+import { METRIC_LABELS } from "./types";
 
 const RESULTS_DIR = process.env.RESULTS_DIR || path.resolve(process.cwd(), "../results");
 
@@ -142,42 +143,63 @@ export interface BestModelEntry {
   runs: RunMetrics[];
 }
 
+function getMetricValue(
+  summary: ModelSummary | null,
+  runs: RunMetrics[],
+  metric: string
+): number | null {
+  const avg = summary?.avg?.[metric];
+  if (avg != null && !Number.isNaN(avg)) return avg;
+  if (runs.length > 0) {
+    const vals = runs.map((r) => r[metric]).filter((v) => v != null && !Number.isNaN(v));
+    return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+  }
+  return null;
+}
+
 /**
- * Returns the top N models ranked by MAE (ascending).
- * Uses summary.avg.MAE when available, otherwise the mean of runs' MAE.
+ * Returns the top N models ranked by the specified metric.
+ * Uses summary.avg when available, otherwise the mean of runs.
+ * @param n - Number of models to return
+ * @param metric - Metric to rank by (default: MAE). Lower-is-better metrics sort ascending; higher-is-better (R2, PICP) sort descending.
  */
-export function getBestModels(n: number = 5): BestModelEntry[] {
+export function getBestModels(
+  n: number = 5,
+  metric: string = "MAE"
+): BestModelEntry[] {
   const experiments = listExperiments();
-  const candidates: BestModelEntry[] = [];
+  const candidates: { entry: Omit<BestModelEntry, "rank">; value: number }[] = [];
+
+  const meta = METRIC_LABELS[metric];
+  const lowerBetter = meta?.lowerBetter ?? true;
 
   for (const exp of experiments) {
     for (const modelInfo of exp.models) {
       const runs = readAllRunMetrics(exp.name, modelInfo.name);
       const summary = readModelSummary(exp.name, modelInfo.name);
-
-      let mae: number;
-      if (summary?.avg?.MAE != null && !Number.isNaN(summary.avg.MAE)) {
-        mae = summary.avg.MAE;
-      } else if (runs.length > 0) {
-        const maes = runs.map((r) => r.MAE).filter((v) => v != null && !Number.isNaN(v));
-        mae = maes.length > 0 ? maes.reduce((a, b) => a + b, 0) / maes.length : Infinity;
-      } else {
-        continue;
-      }
+      const value = getMetricValue(summary, runs, metric);
+      if (value == null || Number.isNaN(value)) continue;
 
       candidates.push({
-        experiment: exp.name,
-        model: modelInfo.name,
-        experimentDisplayName: exp.displayName,
-        modelDisplayName: modelInfo.displayName,
-        rank: 0,
-        mae,
-        summary,
-        runs,
+        entry: {
+          experiment: exp.name,
+          model: modelInfo.name,
+          experimentDisplayName: exp.displayName,
+          modelDisplayName: modelInfo.displayName,
+          mae: getMetricValue(summary, runs, "MAE") ?? value,
+          summary,
+          runs,
+        },
+        value,
       });
     }
   }
 
-  candidates.sort((a, b) => a.mae - b.mae);
-  return candidates.slice(0, n).map((c, i) => ({ ...c, rank: i + 1 }));
+  candidates.sort((a, b) =>
+    lowerBetter ? a.value - b.value : b.value - a.value
+  );
+  return candidates.slice(0, n).map((c, i) => ({
+    ...c.entry,
+    rank: i + 1,
+  }));
 }

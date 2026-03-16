@@ -754,6 +754,27 @@ export function computeEDA(): EDAResult {
   return cachedResult;
 }
 
+// ──────────────────── Lightweight Price Timeline ────────────────────
+
+let cachedPriceTimeline: { date: string; price: number }[] | null = null;
+
+/**
+ * Returns daily average price series for the data split timeline.
+ * Lightweight: only parses Date and Prices, no full EDA.
+ */
+export function getPriceTimeline(): { date: string; price: number }[] {
+  if (cachedPriceTimeline) return cachedPriceTimeline;
+  const datasetPath = process.env.DATASET_PATH!;
+  const { rows } = parseCSV(datasetPath);
+  const dailyGroups = groupBy(rows, (r) => r.Date.slice(0, 10));
+  const dailyEntries = [...dailyGroups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  cachedPriceTimeline = dailyEntries.map(([date, group]) => ({
+    date,
+    price: round(mean(group.map((r) => r.Prices))),
+  }));
+  return cachedPriceTimeline;
+}
+
 // ──────────────────── Utility ────────────────────
 
 function round(v: number, decimals = 2): number {

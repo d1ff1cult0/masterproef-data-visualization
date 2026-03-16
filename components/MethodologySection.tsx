@@ -1,5 +1,16 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceArea,
+} from "recharts";
 import { METHODOLOGY } from "@/lib/methodology";
 
 const TRAIN_COLOR = "#2563eb";
@@ -12,6 +23,17 @@ function parseDate(s: string): number {
 
 export default function MethodologySection() {
   const { dataSplit, sequenceConfig, modelConfig, trainingConfig } = METHODOLOGY;
+  const [priceSeries, setPriceSeries] = useState<{ date: string; price: number }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/price-timeline")
+      .then((r) => r.json())
+      .then((data) => setPriceSeries(data.series ?? []))
+      .catch(() => setPriceSeries([]))
+      .finally(() => setLoading(false));
+  }, []);
+
   const start = parseDate(dataSplit.trainStart);
   const end = parseDate(dataSplit.testEnd);
   const total = end - start;
@@ -70,26 +92,98 @@ export default function MethodologySection() {
         </p>
       </div>
 
-      {/* Data split timeline */}
+      {/* Data split timeline with price time series */}
       <div className="border border-zinc-200 rounded-lg p-4 bg-white">
         <h3 className="text-sm font-medium text-zinc-700 mb-4">
           Data Split Timeline
         </h3>
         <div className="space-y-3">
-          <div className="relative h-10 bg-zinc-100 rounded overflow-hidden">
-            {segments.map((seg) => (
-              <div
-                key={seg.label}
-                className="absolute top-0 h-full rounded-sm transition-opacity hover:opacity-90"
-                style={{
-                  left: `${seg.left}%`,
-                  width: `${seg.width}%`,
-                  backgroundColor: seg.color,
-                }}
-                title={`${seg.label}: ${segments.find((s) => s.label === seg.label)?.start ? new Date(seg.start).toLocaleDateString() : ""} – ${new Date(seg.end).toLocaleDateString()}`}
-              />
-            ))}
-          </div>
+          {loading ? (
+            <div className="h-48 flex items-center justify-center text-sm text-zinc-500">
+              Loading price data…
+            </div>
+          ) : priceSeries.length > 0 ? (
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart
+                data={priceSeries}
+                margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
+                <XAxis
+                  dataKey="date"
+                  type="category"
+                  tick={{ fontSize: 10, fill: "#71717a" }}
+                  tickFormatter={(v) =>
+                    new Date(v + "T00:00:00Z").toLocaleDateString("en-GB", {
+                      month: "short",
+                      year: "2-digit",
+                    })
+                  }
+                />
+                <YAxis
+                  tick={{ fontSize: 10, fill: "#71717a" }}
+                  tickFormatter={(v) => `${v}`}
+                />
+                <Tooltip
+                  contentStyle={{
+                    fontSize: 11,
+                    backgroundColor: "#ffffff",
+                    border: "1px solid #e4e4e7",
+                    borderRadius: 6,
+                  }}
+                  labelFormatter={(label) =>
+                    new Date(label + "T00:00:00Z").toLocaleDateString("en-GB", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })
+                  }
+                  formatter={(value: unknown) => [`€${Number(value ?? 0).toFixed(2)}`, "Daily avg"]}
+                />
+                <ReferenceArea
+                  x1={dataSplit.trainStart}
+                  x2={dataSplit.trainEnd}
+                  fill={TRAIN_COLOR}
+                  fillOpacity={0.2}
+                />
+                <ReferenceArea
+                  x1={dataSplit.valStart}
+                  x2={dataSplit.valEnd}
+                  fill={VAL_COLOR}
+                  fillOpacity={0.2}
+                />
+                <ReferenceArea
+                  x1={dataSplit.testStart}
+                  x2={dataSplit.testEnd}
+                  fill={TEST_COLOR}
+                  fillOpacity={0.2}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="price"
+                  stroke="#18181b"
+                  strokeWidth={1.5}
+                  dot={false}
+                  connectNulls
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="relative h-10 bg-zinc-100 rounded overflow-hidden">
+              {segments.map((seg) => (
+                <div
+                  key={seg.label}
+                  className="absolute top-0 h-full rounded-sm transition-opacity hover:opacity-90"
+                  style={{
+                    left: `${seg.left}%`,
+                    width: `${seg.width}%`,
+                    backgroundColor: seg.color,
+                  }}
+                  title={`${seg.label}: ${new Date(seg.start).toLocaleDateString()} – ${new Date(seg.end).toLocaleDateString()}`}
+                />
+              ))}
+            </div>
+          )}
           <div className="flex flex-wrap gap-6 text-xs">
             {segments.map((seg) => (
               <div key={seg.label} className="flex items-center gap-2">

@@ -10,12 +10,6 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
-  Legend,
 } from "recharts";
 import type { SelectedModel } from "@/lib/types";
 import {
@@ -92,13 +86,17 @@ function getStd(entry: BestModelEntry, metric: string): number | null {
   return null;
 }
 
+const METRIC_OPTIONS = ["MAE", "RMSE", "CRPS", "R2", "PICP", "IntervalScore", "MAPE", "MSE", "MPIW", "PINAW"];
+
 export default function BestModelsLanding({ onCompareInDashboard }: BestModelsLandingProps) {
   const [models, setModels] = useState<BestModelEntry[]>([]);
+  const [selectedMetric, setSelectedMetric] = useState<string>("MAE");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/best-models?n=5")
+    setLoading(true);
+    fetch(`/api/best-models?n=5&metric=${encodeURIComponent(selectedMetric)}`)
       .then((r) => r.json())
       .then((data) => {
         setModels(data.models ?? []);
@@ -109,42 +107,10 @@ export default function BestModelsLanding({ onCompareInDashboard }: BestModelsLa
         setModels([]);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [selectedMetric]);
 
   const modelColors = useMemo(() => {
     return models.map((_, i) => MODEL_COLORS[i % MODEL_COLORS.length]);
-  }, [models]);
-
-  const { radarData, radarMetrics } = useMemo(() => {
-    const metrics = ["MAE", "RMSE", "CRPS", "PICP", "R2", "IntervalScore"].filter((k) =>
-      models.some((m) => getValue(m, k) != null)
-    );
-    if (metrics.length === 0 || models.length === 0) return { radarData: [], radarMetrics: metrics };
-    const maxByMetric: Record<string, number> = {};
-    const minByMetric: Record<string, number> = {};
-    for (const k of metrics) {
-      const meta = METRIC_LABELS[k];
-      const vals = models.map((m) => getValue(m, k)).filter((v): v is number => v != null);
-      if (vals.length === 0) continue;
-      maxByMetric[k] = meta?.lowerBetter ? Math.max(...vals) : Math.max(...vals);
-      minByMetric[k] = meta?.lowerBetter ? Math.min(...vals) : Math.min(...vals);
-    }
-
-    const data = metrics.map((metric) => {
-      const meta = METRIC_LABELS[metric];
-      const obj: Record<string, string | number> = { metric: meta?.label ?? metric };
-      const max = maxByMetric[metric] ?? 1;
-      const min = minByMetric[metric] ?? 0;
-      const range = Math.max(max - min, 1e-9);
-      models.forEach((m, i) => {
-        const v = getValue(m, metric);
-        if (v != null) {
-          obj[`m${i}`] = meta?.lowerBetter ? (max - v) / range : (v - min) / range;
-        }
-      });
-      return obj;
-    });
-    return { radarData: data, radarMetrics: metrics };
   }, [models]);
 
   const handleCompareInDashboard = () => {
@@ -220,21 +186,38 @@ export default function BestModelsLanding({ onCompareInDashboard }: BestModelsLa
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h2 className="text-xl font-semibold text-zinc-900">
-              Top 5 Models by MAE
+              Top 5 Models by {METRIC_LABELS[selectedMetric]?.label ?? selectedMetric}
             </h2>
             <p className="text-sm text-zinc-500 mt-0.5">
-              Best-performing models across all experiments, ranked by mean absolute error.
+              Best-performing models across all experiments, ranked by your selected metric.
             </p>
           </div>
-        {onCompareInDashboard && (
-          <button
-            onClick={handleCompareInDashboard}
-            className="shrink-0 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Compare in Dashboard
-          </button>
-        )}
-      </div>
+          <div className="flex items-center gap-3 shrink-0">
+            <label htmlFor="metric-select" className="text-sm font-medium text-zinc-600">
+              Rank by:
+            </label>
+            <select
+              id="metric-select"
+              value={selectedMetric}
+              onChange={(e) => setSelectedMetric(e.target.value)}
+              className="text-sm border border-zinc-300 rounded-md px-3 py-1.5 bg-white text-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              {METRIC_OPTIONS.map((m) => (
+                <option key={m} value={m}>
+                  {METRIC_LABELS[m]?.label ?? m}
+                </option>
+              ))}
+            </select>
+            {onCompareInDashboard && (
+            <button
+              onClick={handleCompareInDashboard}
+              className="shrink-0 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Compare in Dashboard
+            </button>
+          )}
+          </div>
+        </div>
 
       {/* Rank cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -261,65 +244,24 @@ export default function BestModelsLanding({ onCompareInDashboard }: BestModelsLa
               </h3>
               <div className="mt-3 space-y-1 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-zinc-500">MAE</span>
+                  <span className="text-zinc-500">{METRIC_LABELS[selectedMetric]?.label ?? selectedMetric}</span>
                   <span className="font-medium tabular-nums text-zinc-700">
-                    {formatValue(getValue(m, "MAE"), "MAE")}
+                    {formatValue(getValue(m, selectedMetric), selectedMetric)}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-500">RMSE</span>
-                  <span className="tabular-nums text-zinc-600">
-                    {formatValue(getValue(m, "RMSE"), "RMSE")}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-500">CRPS</span>
-                  <span className="tabular-nums text-zinc-600">
-                    {formatValue(getValue(m, "CRPS"), "CRPS")}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-500">PICP</span>
-                  <span className="tabular-nums text-zinc-600">
-                    {formatValue(getValue(m, "PICP"), "PICP")}
-                  </span>
-                </div>
+                {KEY_METRICS.filter((k) => k !== selectedMetric).slice(0, 3).map((k) => (
+                  <div key={k} className="flex justify-between">
+                    <span className="text-zinc-500">{METRIC_LABELS[k]?.label ?? k}</span>
+                    <span className="tabular-nums text-zinc-600">
+                      {formatValue(getValue(m, k), k)}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           );
         })}
       </div>
-
-      {/* Radar chart (normalized comparison) */}
-      {radarData.length > 0 && models.length <= 5 && (
-        <div className="border border-zinc-200 rounded-lg p-4 bg-white">
-          <h3 className="text-sm font-medium text-zinc-700 mb-4">
-            Normalized Multi-Metric Comparison
-          </h3>
-          <ResponsiveContainer width="100%" height={320}>
-            <RadarChart data={radarData}>
-              <PolarGrid stroke="#e4e4e7" />
-              <PolarAngleAxis
-                dataKey="metric"
-                tick={{ fontSize: 10, fill: "#71717a" }}
-              />
-              <PolarRadiusAxis angle={90} domain={[0, 1]} tick={{ fontSize: 9 }} />
-              {models.map((m, i) => (
-                <Radar
-                  key={i}
-                  name={m.modelDisplayName.replace(/_/g, " ")}
-                  dataKey={`m${i}`}
-                  stroke={modelColors[i]}
-                  fill={modelColors[i]}
-                  fillOpacity={0.2}
-                  strokeWidth={1.5}
-                />
-              ))}
-              <Legend />
-            </RadarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
 
       {/* Bar charts for key metrics */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
