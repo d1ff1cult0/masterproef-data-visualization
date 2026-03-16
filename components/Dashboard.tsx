@@ -4,11 +4,13 @@ import { useState } from "react";
 import Sidebar from "./Sidebar";
 import MetricsView from "./MetricsView";
 import PredictionsChart from "./PredictionsChart";
+import StatusUpdateView from "./StatusUpdateView";
 import type { SelectedModel } from "@/lib/types";
 
 export default function Dashboard() {
   const [selectedModels, setSelectedModels] = useState<SelectedModel[]>([]);
-  const [activeTab, setActiveTab] = useState<"metrics" | "predictions">("metrics");
+  const [activeTab, setActiveTab] = useState<"metrics" | "predictions" | "status-updates">("metrics");
+  const [selectedStatusUpdateId, setSelectedStatusUpdateId] = useState<string | null>(null);
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -17,9 +19,13 @@ export default function Dashboard() {
         onSelectionChange={setSelectedModels}
         activeTab={activeTab}
         onTabChange={setActiveTab}
+        selectedStatusUpdateId={selectedStatusUpdateId}
+        onStatusUpdateChange={setSelectedStatusUpdateId}
       />
       <main className="flex-1 overflow-y-auto bg-white">
-        {selectedModels.length === 0 ? (
+        {activeTab === "status-updates" ? (
+          <StatusUpdateView selectedUpdateId={selectedStatusUpdateId} />
+        ) : selectedModels.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center max-w-md">
               <div className="w-12 h-12 rounded-xl bg-zinc-100 flex items-center justify-center mx-auto mb-4">

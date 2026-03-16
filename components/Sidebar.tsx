@@ -2,13 +2,16 @@
 
 import { useEffect, useState } from "react";
 import type { Experiment, SelectedModel } from "@/lib/types";
-import { MODEL_COLORS } from "@/lib/types";
+import { MODEL_COLORS, EXPERIMENT_NOTEBOOK_MAP } from "@/lib/types";
+import { STATUS_UPDATES } from "@/lib/status-updates";
 
 interface SidebarProps {
   selectedModels: SelectedModel[];
   onSelectionChange: (models: SelectedModel[]) => void;
-  activeTab: "metrics" | "predictions";
-  onTabChange: (tab: "metrics" | "predictions") => void;
+  activeTab: "metrics" | "predictions" | "status-updates";
+  onTabChange: (tab: "metrics" | "predictions" | "status-updates") => void;
+  selectedStatusUpdateId: string | null;
+  onStatusUpdateChange: (id: string | null) => void;
 }
 
 export default function Sidebar({
@@ -16,6 +19,8 @@ export default function Sidebar({
   onSelectionChange,
   activeTab,
   onTabChange,
+  selectedStatusUpdateId,
+  onStatusUpdateChange,
 }: SidebarProps) {
   const [experiments, setExperiments] = useState<Experiment[]>([]);
   const [expandedExp, setExpandedExp] = useState<string | null>(null);
@@ -79,7 +84,7 @@ export default function Sidebar({
       <div className="flex border-b border-zinc-200">
         <button
           onClick={() => onTabChange("metrics")}
-          className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
+          className={`flex-1 px-2 py-2 text-xs font-medium transition-colors ${
             activeTab === "metrics"
               ? "text-blue-600 border-b-2 border-blue-600"
               : "text-zinc-500 hover:text-zinc-700"
@@ -89,7 +94,7 @@ export default function Sidebar({
         </button>
         <button
           onClick={() => onTabChange("predictions")}
-          className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
+          className={`flex-1 px-2 py-2 text-xs font-medium transition-colors ${
             activeTab === "predictions"
               ? "text-blue-600 border-b-2 border-blue-600"
               : "text-zinc-500 hover:text-zinc-700"
@@ -97,10 +102,43 @@ export default function Sidebar({
         >
           Predictions
         </button>
+        <button
+          onClick={() => onTabChange("status-updates")}
+          className={`flex-1 px-2 py-2 text-xs font-medium transition-colors ${
+            activeTab === "status-updates"
+              ? "text-blue-600 border-b-2 border-blue-600"
+              : "text-zinc-500 hover:text-zinc-700"
+          }`}
+        >
+          Status
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-1">
-        {loading ? (
+        {activeTab === "status-updates" ? (
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-zinc-600">Status Updates</p>
+            <p className="text-xs text-zinc-500">
+              Bi-weekly progress reports for thesis supervisors.
+            </p>
+            <div className="space-y-1 mt-3">
+              {STATUS_UPDATES.map((u) => (
+                <button
+                  key={u.id}
+                  onClick={() => onStatusUpdateChange(selectedStatusUpdateId === u.id ? null : u.id)}
+                  className={`w-full text-left px-2 py-2 rounded text-xs transition-colors ${
+                    selectedStatusUpdateId === u.id
+                      ? "bg-blue-50 text-blue-700 border border-blue-200"
+                      : "text-zinc-600 hover:bg-zinc-200/60 border border-transparent"
+                  }`}
+                >
+                  <span className="font-medium">Update {u.number}</span>
+                  <span className="block text-zinc-500 truncate mt-0.5">{u.title}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : loading ? (
           <div className="text-xs text-zinc-500 p-2">Loading experiments...</div>
         ) : experiments.length === 0 ? (
           <div className="text-xs text-zinc-500 p-2">No experiments found</div>
@@ -111,7 +149,12 @@ export default function Sidebar({
                 onClick={() => setExpandedExp(expandedExp === exp.name ? null : exp.name)}
                 className="w-full text-left px-2 py-1.5 rounded text-xs font-medium text-zinc-700 hover:bg-zinc-200/60 transition-colors flex items-center justify-between"
               >
-                <span className="truncate">{exp.displayName}</span>
+                <span className="truncate">
+                  {exp.displayName}
+                  {EXPERIMENT_NOTEBOOK_MAP[exp.name] != null && (
+                    <span className="text-zinc-400 font-normal ml-1">(N{EXPERIMENT_NOTEBOOK_MAP[exp.name]})</span>
+                  )}
+                </span>
                 <svg
                   className={`w-3 h-3 shrink-0 transition-transform ${expandedExp === exp.name ? "rotate-90" : ""}`}
                   fill="none"
@@ -185,7 +228,7 @@ export default function Sidebar({
         )}
       </div>
 
-      {selectedModels.length > 0 && (
+      {selectedModels.length > 0 && activeTab !== "status-updates" && (
         <div className="border-t border-zinc-200 p-3">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-medium text-zinc-600">
@@ -199,21 +242,25 @@ export default function Sidebar({
             </button>
           </div>
           <div className="space-y-1">
-            {selectedModels.map((m) => (
-              <div
-                key={`${m.experiment}/${m.model}`}
-                className="flex items-center gap-1.5 text-xs text-zinc-500"
-              >
-                <span
-                  className="w-2 h-2 rounded-full shrink-0"
-                  style={{ backgroundColor: m.color }}
-                />
-                <span className="truncate">{formatModelName(m.model)}</span>
-                <span className="text-zinc-400 ml-auto shrink-0">
-                  {m.run === "average" ? "avg" : `#${m.run}`}
-                </span>
-              </div>
-            ))}
+            {selectedModels.map((m) => {
+              const notebook = EXPERIMENT_NOTEBOOK_MAP[m.experiment];
+              return (
+                <div
+                  key={`${m.experiment}/${m.model}`}
+                  className="flex items-center gap-1.5 text-xs text-zinc-500"
+                >
+                  <span
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{ backgroundColor: m.color }}
+                  />
+                  <span className="truncate">{formatModelName(m.model)}</span>
+                  <span className="text-zinc-400 ml-auto shrink-0 flex items-center gap-1">
+                    {notebook != null && <span>N{notebook}</span>}
+                    {m.run === "average" ? "avg" : `#${m.run}`}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

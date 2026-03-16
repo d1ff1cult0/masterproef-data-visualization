@@ -100,3 +100,17 @@ export const MODEL_COLORS = [
 ];
 
 export const KEY_METRICS = ["MAE", "RMSE", "CRPS", "R2", "PICP", "IntervalScore"];
+
+/** Maps experiment folder names (e.g. moe_comparison) to notebook numbers for display in the sidebar. */
+export const EXPERIMENT_NOTEBOOK_MAP: Record<string, number> = {
+  lag_study: 3,
+  head_study: 4,
+  preprocessing_study: 5,
+  benchmark: 6,
+  hybrid_comparison: 7,
+  price_floor_comparison: 8,
+  moe_comparison: 9,
+  directions_210: 10,
+  rolling_evaluation: 11,
+  transformer_grid_search: 2,
+};
