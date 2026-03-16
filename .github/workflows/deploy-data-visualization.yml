@@ -1,0 +1,17 @@
+name: Deploy Data Visualization to Server
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Pull and Deploy
+        run: |
+          cd /home/d1ff1cult/Server/masterproef-data-visualization
+          git pull origin main
+          docker compose build --no-cache
+          docker compose up -d
