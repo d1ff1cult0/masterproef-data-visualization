@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import type { StatusUpdate, StatusUpdateSection } from "@/lib/status-updates";
+import type { StatusUpdateSection } from "@/lib/status-updates";
 import { STATUS_UPDATES } from "@/lib/status-updates";
 
 interface StatusUpdateViewProps {
   selectedUpdateId: string | null;
+  onSelectUpdate: (id: string | null) => void;
 }
 
 function StatusUpdateImage({ src, alt }: { src: string; alt: string }) {
@@ -35,7 +36,7 @@ function StatusUpdateImage({ src, alt }: { src: string; alt: string }) {
 
 function SectionRenderer({ section }: { section: StatusUpdateSection }) {
   switch (section.type) {
-    case "heading":
+    case "heading": {
       const Tag = section.level === 1 ? "h1" : section.level === 2 ? "h2" : "h3";
       const headingClass =
         section.level === 1
@@ -44,6 +45,7 @@ function SectionRenderer({ section }: { section: StatusUpdateSection }) {
             ? "text-xl font-semibold text-zinc-900 mt-8 mb-3"
             : "text-lg font-medium text-zinc-800 mt-6 mb-2";
       return <Tag className={headingClass}>{section.text}</Tag>;
+    }
 
     case "paragraph":
       return (
@@ -84,7 +86,7 @@ function SectionRenderer({ section }: { section: StatusUpdateSection }) {
         </dl>
       );
 
-    case "table":
+    case "table": {
       const t = section.table;
       if (!t) return null;
       return (
@@ -118,6 +120,7 @@ function SectionRenderer({ section }: { section: StatusUpdateSection }) {
           </table>
         </div>
       );
+    }
 
     case "figure":
       return (
@@ -153,41 +156,66 @@ function SectionRenderer({ section }: { section: StatusUpdateSection }) {
 
 export default function StatusUpdateView({
   selectedUpdateId,
+  onSelectUpdate,
 }: StatusUpdateViewProps) {
   const selectedUpdate = STATUS_UPDATES.find((u) => u.id === selectedUpdateId);
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      {!selectedUpdate ? (
-        <div className="flex flex-col items-center justify-center py-24 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-zinc-100 flex items-center justify-center mb-4">
-            <svg className="w-8 h-8 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          </div>
-          <h2 className="text-lg font-semibold text-zinc-900 mb-1">Status Updates</h2>
-          <p className="text-sm text-zinc-500 max-w-sm">
-            Bi-weekly progress reports for thesis supervisors. Select an update from the sidebar to view its content.
-          </p>
+    <div className="flex flex-1 overflow-hidden">
+      <aside className="w-72 shrink-0 border-r border-zinc-200 bg-white flex flex-col overflow-hidden">
+        <div className="px-4 py-3 border-b border-zinc-100">
+          <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+            Status Updates
+          </h2>
         </div>
-      ) : (
-        <article className="prose prose-zinc">
-          <header className="mb-8 pb-6 border-b border-zinc-200">
-            <h1 className="text-2xl font-bold text-zinc-900">
-              Status Update {selectedUpdate.number}: {selectedUpdate.title}
-            </h1>
-            {selectedUpdate.date && (
-              <p className="text-sm text-zinc-500 mt-1">{selectedUpdate.date}</p>
-            )}
-          </header>
+        <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+          {STATUS_UPDATES.map((u) => (
+            <button
+              key={u.id}
+              onClick={() => onSelectUpdate(selectedUpdateId === u.id ? null : u.id)}
+              className={`w-full text-left px-3 py-2.5 rounded-md text-xs transition-colors ${
+                selectedUpdateId === u.id
+                  ? "bg-blue-50 text-blue-700 ring-1 ring-blue-200"
+                  : "text-zinc-600 hover:bg-zinc-50"
+              }`}
+            >
+              <span className="font-medium">Update {u.number}</span>
+              <span className={`block truncate mt-0.5 ${selectedUpdateId === u.id ? "text-blue-500" : "text-zinc-400"}`}>
+                {u.title}
+              </span>
+            </button>
+          ))}
+        </div>
+      </aside>
 
-          <div className="space-y-0">
-            {selectedUpdate.content.map((section, i) => (
-              <SectionRenderer key={i} section={section} />
-            ))}
+      <main className="flex-1 overflow-y-auto bg-zinc-50/50">
+        {!selectedUpdate ? (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-sm text-zinc-400">
+              Select a status update to view
+            </p>
           </div>
-        </article>
-      )}
+        ) : (
+          <div className="p-8 max-w-4xl mx-auto">
+            <article>
+              <header className="mb-8 pb-6 border-b border-zinc-200">
+                <h1 className="text-2xl font-bold text-zinc-900">
+                  Status Update {selectedUpdate.number}: {selectedUpdate.title}
+                </h1>
+                {selectedUpdate.date && (
+                  <p className="text-sm text-zinc-500 mt-1">{selectedUpdate.date}</p>
+                )}
+              </header>
+
+              <div className="space-y-0">
+                {selectedUpdate.content.map((section, i) => (
+                  <SectionRenderer key={i} section={section} />
+                ))}
+              </div>
+            </article>
+          </div>
+        )}
+      </main>
     </div>
   );
 }

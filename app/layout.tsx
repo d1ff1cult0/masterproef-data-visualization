@@ -15,6 +15,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "EPF Results Dashboard",
   description: "Electricity Price Forecasting experiment results visualization",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({

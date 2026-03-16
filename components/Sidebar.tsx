@@ -1,26 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import type { Experiment, SelectedModel } from "@/lib/types";
 import { MODEL_COLORS, EXPERIMENT_NOTEBOOK_MAP } from "@/lib/types";
-import { STATUS_UPDATES } from "@/lib/status-updates";
 
 interface SidebarProps {
   selectedModels: SelectedModel[];
   onSelectionChange: (models: SelectedModel[]) => void;
-  activeTab: "metrics" | "predictions" | "status-updates";
-  onTabChange: (tab: "metrics" | "predictions" | "status-updates") => void;
-  selectedStatusUpdateId: string | null;
-  onStatusUpdateChange: (id: string | null) => void;
 }
 
 export default function Sidebar({
   selectedModels,
   onSelectionChange,
-  activeTab,
-  onTabChange,
-  selectedStatusUpdateId,
-  onStatusUpdateChange,
 }: SidebarProps) {
   const [experiments, setExperiments] = useState<Experiment[]>([]);
   const [expandedExp, setExpandedExp] = useState<string | null>(null);
@@ -38,6 +29,14 @@ export default function Sidebar({
       })
       .catch(() => setLoading(false));
   }, []);
+
+  const sortedExperiments = useMemo(() => {
+    return [...experiments].sort((a, b) => {
+      const na = EXPERIMENT_NOTEBOOK_MAP[a.name] ?? 999;
+      const nb = EXPERIMENT_NOTEBOOK_MAP[b.name] ?? 999;
+      return na - nb;
+    });
+  }, [experiments]);
 
   const isSelected = (experiment: string, model: string) =>
     selectedModels.some((m) => m.experiment === experiment && m.model === model);
@@ -73,172 +72,118 @@ export default function Sidebar({
     name.replace(/_/g, " ").replace(/\(([^)]+)\)/g, "($1)");
 
   return (
-    <aside className="w-72 min-h-screen border-r border-zinc-200 bg-zinc-50 flex flex-col">
-      <div className="p-4 border-b border-zinc-200">
-        <h1 className="text-sm font-semibold tracking-tight text-zinc-900">
-          EPF Results
-        </h1>
-        <p className="text-xs text-zinc-500 mt-0.5">Electricity Price Forecasting</p>
+    <aside className="w-72 shrink-0 border-r border-zinc-200 bg-white flex flex-col overflow-hidden">
+      <div className="px-4 py-3 border-b border-zinc-100">
+        <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+          Experiments
+        </h2>
       </div>
 
-      <div className="flex border-b border-zinc-200">
-        <button
-          onClick={() => onTabChange("metrics")}
-          className={`flex-1 px-2 py-2 text-xs font-medium transition-colors ${
-            activeTab === "metrics"
-              ? "text-blue-600 border-b-2 border-blue-600"
-              : "text-zinc-500 hover:text-zinc-700"
-          }`}
-        >
-          Metrics
-        </button>
-        <button
-          onClick={() => onTabChange("predictions")}
-          className={`flex-1 px-2 py-2 text-xs font-medium transition-colors ${
-            activeTab === "predictions"
-              ? "text-blue-600 border-b-2 border-blue-600"
-              : "text-zinc-500 hover:text-zinc-700"
-          }`}
-        >
-          Predictions
-        </button>
-        <button
-          onClick={() => onTabChange("status-updates")}
-          className={`flex-1 px-2 py-2 text-xs font-medium transition-colors ${
-            activeTab === "status-updates"
-              ? "text-blue-600 border-b-2 border-blue-600"
-              : "text-zinc-500 hover:text-zinc-700"
-          }`}
-        >
-          Status
-        </button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-3 space-y-1">
-        {activeTab === "status-updates" ? (
-          <div className="space-y-2">
-            <p className="text-xs font-medium text-zinc-600">Status Updates</p>
-            <p className="text-xs text-zinc-500">
-              Bi-weekly progress reports for thesis supervisors.
-            </p>
-            <div className="space-y-1 mt-3">
-              {STATUS_UPDATES.map((u) => (
-                <button
-                  key={u.id}
-                  onClick={() => onStatusUpdateChange(selectedStatusUpdateId === u.id ? null : u.id)}
-                  className={`w-full text-left px-2 py-2 rounded text-xs transition-colors ${
-                    selectedStatusUpdateId === u.id
-                      ? "bg-blue-50 text-blue-700 border border-blue-200"
-                      : "text-zinc-600 hover:bg-zinc-200/60 border border-transparent"
-                  }`}
-                >
-                  <span className="font-medium">Update {u.number}</span>
-                  <span className="block text-zinc-500 truncate mt-0.5">{u.title}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : loading ? (
-          <div className="text-xs text-zinc-500 p-2">Loading experiments...</div>
-        ) : experiments.length === 0 ? (
-          <div className="text-xs text-zinc-500 p-2">No experiments found</div>
+      <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+        {loading ? (
+          <div className="text-xs text-zinc-400 p-3 text-center">Loading...</div>
+        ) : sortedExperiments.length === 0 ? (
+          <div className="text-xs text-zinc-400 p-3 text-center">No experiments found</div>
         ) : (
-          experiments.map((exp) => (
-            <div key={exp.name}>
-              <button
-                onClick={() => setExpandedExp(expandedExp === exp.name ? null : exp.name)}
-                className="w-full text-left px-2 py-1.5 rounded text-xs font-medium text-zinc-700 hover:bg-zinc-200/60 transition-colors flex items-center justify-between"
-              >
-                <span className="truncate">
-                  {exp.displayName}
-                  {EXPERIMENT_NOTEBOOK_MAP[exp.name] != null && (
-                    <span className="text-zinc-400 font-normal ml-1">(N{EXPERIMENT_NOTEBOOK_MAP[exp.name]})</span>
-                  )}
-                </span>
-                <svg
-                  className={`w-3 h-3 shrink-0 transition-transform ${expandedExp === exp.name ? "rotate-90" : ""}`}
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
+          sortedExperiments.map((exp) => {
+            const notebook = EXPERIMENT_NOTEBOOK_MAP[exp.name];
+            return (
+              <div key={exp.name}>
+                <button
+                  onClick={() => setExpandedExp(expandedExp === exp.name ? null : exp.name)}
+                  className="w-full text-left px-2.5 py-2 rounded-md text-xs font-medium text-zinc-700 hover:bg-zinc-50 transition-colors flex items-center gap-2"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
+                  <svg
+                    className={`w-3 h-3 shrink-0 text-zinc-400 transition-transform ${expandedExp === exp.name ? "rotate-90" : ""}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                  {notebook != null && (
+                    <span className="shrink-0 w-5 h-5 rounded bg-zinc-100 text-zinc-500 flex items-center justify-center text-[10px] font-semibold">
+                      {notebook}
+                    </span>
+                  )}
+                  <span className="truncate">{exp.displayName}</span>
+                </button>
 
-              {expandedExp === exp.name && (
-                <div className="ml-2 mt-0.5 space-y-0.5">
-                  {exp.models.map((model) => {
-                    const selected = isSelected(exp.name, model.name);
-                    const selModel = selectedModels.find(
-                      (m) => m.experiment === exp.name && m.model === model.name
-                    );
+                {expandedExp === exp.name && (
+                  <div className="ml-5 pl-2.5 mt-0.5 space-y-0.5 border-l border-zinc-100">
+                    {exp.models.map((model) => {
+                      const selected = isSelected(exp.name, model.name);
+                      const selModel = selectedModels.find(
+                        (m) => m.experiment === exp.name && m.model === model.name
+                      );
 
-                    return (
-                      <div key={model.name} className="space-y-0.5">
-                        <label className="flex items-center gap-2 px-2 py-1 rounded text-xs cursor-pointer hover:bg-zinc-200/60 transition-colors">
-                          <input
-                            type="checkbox"
-                            checked={selected}
-                            onChange={() => toggleModel(exp.name, model.name)}
-                            className="rounded border-zinc-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 h-3 w-3"
-                          />
-                          <span
-                            className="truncate text-zinc-600"
-                            title={formatModelName(model.name)}
-                          >
-                            {formatModelName(model.name)}
-                          </span>
-                          {selected && selModel && (
-                            <span
-                              className="ml-auto w-2 h-2 rounded-full shrink-0"
-                              style={{ backgroundColor: selModel.color }}
+                      return (
+                        <div key={model.name} className="space-y-0.5">
+                          <label className="flex items-center gap-2 px-2 py-1.5 rounded-md text-xs cursor-pointer hover:bg-zinc-50 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              onChange={() => toggleModel(exp.name, model.name)}
+                              className="rounded border-zinc-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 h-3 w-3"
                             />
-                          )}
-                        </label>
-
-                        {selected && (
-                          <div className="ml-6 pb-1">
-                            <select
-                              value={selModel?.run ?? "average"}
-                              onChange={(e) =>
-                                updateRun(exp.name, model.name, e.target.value)
-                              }
-                              className="w-full text-xs bg-white border border-zinc-200 rounded px-1.5 py-0.5 text-zinc-600"
+                            <span
+                              className="truncate text-zinc-600"
+                              title={formatModelName(model.name)}
                             >
-                              <option value="average">Average (all runs)</option>
-                              {Array.from(
-                                { length: getRunOptions(exp.name, model.name) },
-                                (_, i) => (
-                                  <option key={i} value={String(i)}>
-                                    Run {i}
-                                  </option>
-                                )
-                              )}
-                            </select>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          ))
+                              {formatModelName(model.name)}
+                            </span>
+                            {selected && selModel && (
+                              <span
+                                className="ml-auto w-2 h-2 rounded-full shrink-0"
+                                style={{ backgroundColor: selModel.color }}
+                              />
+                            )}
+                          </label>
+
+                          {selected && (
+                            <div className="ml-5 pb-1">
+                              <select
+                                value={selModel?.run ?? "average"}
+                                onChange={(e) =>
+                                  updateRun(exp.name, model.name, e.target.value)
+                                }
+                                className="w-full text-xs bg-white border border-zinc-200 rounded px-1.5 py-0.5 text-zinc-600"
+                              >
+                                <option value="average">Average (all runs)</option>
+                                {Array.from(
+                                  { length: getRunOptions(exp.name, model.name) },
+                                  (_, i) => (
+                                    <option key={i} value={String(i)}>
+                                      Run {i}
+                                    </option>
+                                  )
+                                )}
+                              </select>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })
         )}
       </div>
 
-      {selectedModels.length > 0 && activeTab !== "status-updates" && (
-        <div className="border-t border-zinc-200 p-3">
+      {selectedModels.length > 0 && (
+        <div className="border-t border-zinc-200 p-3 bg-zinc-50/50">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-medium text-zinc-600">
-              {selectedModels.length} model{selectedModels.length > 1 ? "s" : ""} selected
+              {selectedModels.length} selected
             </span>
             <button
               onClick={() => onSelectionChange([])}
               className="text-xs text-red-500 hover:text-red-600 transition-colors"
             >
-              Clear
+              Clear all
             </button>
           </div>
           <div className="space-y-1">
@@ -255,8 +200,8 @@ export default function Sidebar({
                   />
                   <span className="truncate">{formatModelName(m.model)}</span>
                   <span className="text-zinc-400 ml-auto shrink-0 flex items-center gap-1">
-                    {notebook != null && <span>N{notebook}</span>}
-                    {m.run === "average" ? "avg" : `#${m.run}`}
+                    {notebook != null && <span className="text-zinc-300">N{notebook}</span>}
+                    <span>{m.run === "average" ? "avg" : `#${m.run}`}</span>
                   </span>
                 </div>
               );
