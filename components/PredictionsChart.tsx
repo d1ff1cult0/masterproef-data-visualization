@@ -201,6 +201,88 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
     setZoomRight(null);
   };
 
+  const viewMetrics = useMemo(() => {
+    if (viewData.length === 0 || modelKeys.length === 0) return [];
+
+    return modelKeys.map(({ prefix, color, label }) => {
+      const meanKey = `${prefix}_mean`;
+      const qLowerKey = `${prefix}_q_0.025`;
+      const qUpperKey = `${prefix}_q_0.975`;
+      const q10Key = `${prefix}_q_0.1`;
+      const q25Key = `${prefix}_q_0.25`;
+      const q75Key = `${prefix}_q_0.75`;
+      const q90Key = `${prefix}_q_0.9`;
+
+      let sumAE = 0, sumSE = 0, sumMPIW = 0, sumIS = 0, sumCRPS = 0;
+      let countMPIW = 0, countIS = 0, countCRPS = 0;
+      let n = 0;
+
+      for (const p of viewData) {
+        const actual = p.y_test as number;
+        const pred = Number(p[meanKey]) || 0;
+        if (actual == null || pred == null) continue;
+
+        const ae = Math.abs(actual - pred);
+        sumAE += ae;
+        sumSE += ae * ae;
+        n++;
+
+        const lo95 = Number(p[qLowerKey]);
+        const hi95 = Number(p[qUpperKey]);
+        if (!isNaN(lo95) && !isNaN(hi95) && lo95 !== 0 && hi95 !== 0) {
+          const width = hi95 - lo95;
+          sumMPIW += width;
+          countMPIW++;
+
+          const alpha = 0.05;
+          let is = width;
+          if (actual < lo95) is += (2 / alpha) * (lo95 - actual);
+          if (actual > hi95) is += (2 / alpha) * (actual - hi95);
+          sumIS += is;
+          countIS++;
+        }
+
+        const quantiles: [number, number][] = [];
+        const tryQ = (key: string, tau: number) => {
+          const v = Number(p[key]);
+          if (!isNaN(v) && v !== 0) quantiles.push([tau, v]);
+        };
+        tryQ(qLowerKey, 0.025);
+        tryQ(q10Key, 0.1);
+        tryQ(q25Key, 0.25);
+        tryQ(`${prefix}_q_0.5`, 0.5);
+        tryQ(q75Key, 0.75);
+        tryQ(q90Key, 0.9);
+        tryQ(qUpperKey, 0.975);
+
+        if (quantiles.length >= 2) {
+          let pinballSum = 0;
+          for (const [tau, qv] of quantiles) {
+            pinballSum += actual >= qv ? tau * (actual - qv) : (1 - tau) * (qv - actual);
+          }
+          sumCRPS += pinballSum / quantiles.length;
+          countCRPS++;
+        }
+      }
+
+      if (n === 0) return null;
+
+      return {
+        label,
+        color,
+        mae: sumAE / n,
+        rmse: Math.sqrt(sumSE / n),
+        mpiw: countMPIW > 0 ? sumMPIW / countMPIW : null,
+        intervalScore: countIS > 0 ? sumIS / countIS : null,
+        crps: countCRPS > 0 ? sumCRPS / countCRPS : null,
+      };
+    }).filter(Boolean) as {
+      label: string; color: string;
+      mae: number; rmse: number;
+      mpiw: number | null; intervalScore: number | null; crps: number | null;
+    }[];
+  }, [viewData, modelKeys]);
+
   const overviewTickInterval = Math.max(1, Math.floor(allData.length / 8));
 
   return (
@@ -349,6 +431,50 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
               </ComposedChart>
             </ResponsiveContainer>
           </div>
+
+          {viewMetrics.length > 0 && (
+            <div className="border border-zinc-200 rounded-lg bg-white overflow-hidden">
+              <div className="px-4 py-2.5 bg-zinc-50 border-b border-zinc-200">
+                <span className="text-xs font-medium text-zinc-600">
+                  Metrics for {isZoomed ? "zoomed region" : "full test set"} ({viewData.length} points, {Math.ceil(viewData.length / 24)} days)
+                </span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-zinc-100">
+                      <th className="text-left py-2 px-4 font-medium text-zinc-500">Model</th>
+                      <th className="text-right py-2 px-4 font-medium text-zinc-500">MAE</th>
+                      <th className="text-right py-2 px-4 font-medium text-zinc-500">RMSE</th>
+                      <th className="text-right py-2 px-4 font-medium text-zinc-500">MPIW</th>
+                      <th className="text-right py-2 px-4 font-medium text-zinc-500">Interval Score</th>
+                      <th className="text-right py-2 px-4 font-medium text-zinc-500">CRPS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {viewMetrics.map((m) => {
+                      const fmt = (v: number | null) => v != null ? v.toFixed(2) : "—";
+                      return (
+                        <tr key={m.label} className="border-b border-zinc-50 last:border-0">
+                          <td className="py-2 px-4">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: m.color }} />
+                              <span className="text-zinc-700 font-medium">{m.label}</span>
+                            </div>
+                          </td>
+                          <td className="text-right py-2 px-4 tabular-nums text-zinc-600">{fmt(m.mae)}</td>
+                          <td className="text-right py-2 px-4 tabular-nums text-zinc-600">{fmt(m.rmse)}</td>
+                          <td className="text-right py-2 px-4 tabular-nums text-zinc-600">{fmt(m.mpiw)}</td>
+                          <td className="text-right py-2 px-4 tabular-nums text-zinc-600">{fmt(m.intervalScore)}</td>
+                          <td className="text-right py-2 px-4 tabular-nums text-zinc-600">{fmt(m.crps)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {isZoomed && (
             <div className="border border-zinc-200 rounded-lg p-4 bg-white">
