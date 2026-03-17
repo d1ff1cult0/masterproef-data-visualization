@@ -81,6 +81,10 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
   const [zoomStartIdx, setZoomStartIdx] = useState<number | null>(null);
   const [zoomEndIdx, setZoomEndIdx] = useState<number | null>(null);
 
+  // Y-axis: null = auto from visible data; { min, max } = manual
+  const [priceYDomain, setPriceYDomain] = useState<{ min: number; max: number } | null>(null);
+  const [residualYDomain, setResidualYDomain] = useState<{ min: number; max: number } | null>(null);
+
   const startDay = Math.max(0, dateToDay(startDate));
   const effectiveDuration = duration === -1 ? (totalDays || 9999) : duration;
   const endDay = Math.min(totalDays || 9999, startDay + effectiveDuration);
@@ -206,6 +210,40 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
     }
     return value;
   };
+
+  // When zoomed in enough that a day spans multiple grid lines, align grid to midnight (00:00)
+  // so 24-hour prediction periods are easy to see. Use when showing ≤14 days of hourly data.
+  const midnightTicks = useMemo(() => {
+    if (viewData.length === 0 || viewData.length > 24 * 14) return undefined;
+    const ticks = viewData.filter((p) => p.hour === 0).map((p) => p.date);
+    return ticks.length >= 2 ? ticks : undefined;
+  }, [viewData]);
+
+  // Auto Y extent from visible data (used when domain is null, and to pre-fill manual mode)
+  const priceYExtent = useMemo(() => {
+    if (viewData.length === 0 || modelKeys.length === 0) return undefined;
+    let min = Infinity;
+    let max = -Infinity;
+    for (const p of viewData) {
+      const vals: number[] = [Number(p.y_test) ?? 0];
+      for (const { prefix } of modelKeys) {
+        vals.push(Number(p[`${prefix}_mean`]) ?? 0);
+        for (const band of QUANTILE_BANDS) {
+          const b = p[`${prefix}_band_${band.label}`];
+          if (Array.isArray(b)) vals.push(Number(b[0]) ?? 0, Number(b[1]) ?? 0);
+        }
+      }
+      for (const v of vals) {
+        if (!Number.isNaN(v)) {
+          min = Math.min(min, v);
+          max = Math.max(max, v);
+        }
+      }
+    }
+    if (min > max) return undefined;
+    const pad = (max - min) * 0.05 || 1;
+    return { min: min - pad, max: max + pad };
+  }, [viewData, modelKeys]);
 
   const handleMouseDown = (e: { activeLabel?: string }) => {
     if (e?.activeLabel) {
@@ -361,6 +399,24 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
       return pt;
     });
   }, [viewData, modelKeys]);
+
+  const residualYExtent = useMemo(() => {
+    if (residualsData.length === 0 || modelKeys.length === 0) return undefined;
+    let min = Infinity;
+    let max = -Infinity;
+    for (const p of residualsData) {
+      for (const { prefix } of modelKeys) {
+        const v = Number(p[`${prefix}_residual`]) ?? 0;
+        if (!Number.isNaN(v)) {
+          min = Math.min(min, v);
+          max = Math.max(max, v);
+        }
+      }
+    }
+    if (min > max) return undefined;
+    const pad = (max - min) * 0.05 || 1;
+    return { min: min - pad, max: max + pad };
+  }, [residualsData, modelKeys]);
 
   // Histogram for residual distribution (tail behaviour)
   const RESIDUAL_BINS = 20;
@@ -529,10 +585,64 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
         <>
           {/* Main chart */}
           <div className="border border-zinc-200 rounded-lg p-4 bg-white">
-            <div className="text-xs text-zinc-400 mb-2">
-              {isZoomed
-                ? `Zoomed: ${viewData[0]?.date ?? ""} to ${viewData[viewData.length - 1]?.date ?? ""} (${viewData.length} points) — drag to zoom further, or reset`
-                : "Drag on the chart to zoom into a region"}
+            <div className="text-xs text-zinc-400 mb-2 flex flex-wrap items-center justify-between gap-2">
+              <span>
+                {isZoomed
+                  ? `Zoomed: ${viewData[0]?.date ?? ""} to ${viewData[viewData.length - 1]?.date ?? ""} (${viewData.length} points) — drag to zoom further, or reset`
+                  : "Drag on the chart to zoom into a region"}
+              </span>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-zinc-500">Y scale:</span>
+                {priceYDomain == null ? (
+                  <>
+                    <span className="text-zinc-400">Auto</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        priceYExtent &&
+                        setPriceYDomain({ min: priceYExtent.min, max: priceYExtent.max })
+                      }
+                      disabled={!priceYExtent}
+                      className="text-xs px-2 py-1 rounded border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition-colors disabled:opacity-50"
+                    >
+                      Set manual
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <input
+                      type="number"
+                      value={priceYDomain.min}
+                      onChange={(e) =>
+                        setPriceYDomain((d) =>
+                          d ? { ...d, min: Number(e.target.value) || 0 } : null
+                        )
+                      }
+                      step="any"
+                      className="w-16 text-xs px-1.5 py-0.5 rounded border border-zinc-200 bg-white text-zinc-700"
+                    />
+                    <span className="text-zinc-400">to</span>
+                    <input
+                      type="number"
+                      value={priceYDomain.max}
+                      onChange={(e) =>
+                        setPriceYDomain((d) =>
+                          d ? { ...d, max: Number(e.target.value) || 0 } : null
+                        )
+                      }
+                      step="any"
+                      className="w-16 text-xs px-1.5 py-0.5 rounded border border-zinc-200 bg-white text-zinc-700"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setPriceYDomain(null)}
+                      className="text-xs px-2 py-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
+                    >
+                      Auto
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
             <ResponsiveContainer width="100%" height={460}>
               <ComposedChart
@@ -548,12 +658,14 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
                   tick={{ fontSize: 9, fill: "#71717a" }}
                   tickFormatter={formatXTick}
                   interval="preserveStartEnd"
+                  ticks={midnightTicks}
                   stroke="#d4d4d8"
                   angle={-30}
                   textAnchor="end"
                   height={50}
                 />
                 <YAxis
+                  domain={priceYDomain ? [priceYDomain.min, priceYDomain.max] : undefined}
                   tick={{ fontSize: 10, fill: "#71717a" }}
                   stroke="#d4d4d8"
                   label={{
@@ -633,9 +745,63 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
 
           {/* Residuals: time series (bias + tail behaviour) */}
           <div className="border border-zinc-200 rounded-lg p-4 bg-white">
-            <h3 className="text-sm font-medium text-zinc-700 mb-2">
-              Residuals (Actual − Predicted)
-            </h3>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <h3 className="text-sm font-medium text-zinc-700">
+                Residuals (Actual − Predicted)
+              </h3>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-zinc-500 text-xs">Y scale:</span>
+                {residualYDomain == null ? (
+                  <>
+                    <span className="text-zinc-400 text-xs">Auto</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        residualYExtent &&
+                        setResidualYDomain({ min: residualYExtent.min, max: residualYExtent.max })
+                      }
+                      disabled={!residualYExtent}
+                      className="text-xs px-2 py-1 rounded border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition-colors disabled:opacity-50"
+                    >
+                      Set manual
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <input
+                      type="number"
+                      value={residualYDomain.min}
+                      onChange={(e) =>
+                        setResidualYDomain((d) =>
+                          d ? { ...d, min: Number(e.target.value) || 0 } : null
+                        )
+                      }
+                      step="any"
+                      className="w-16 text-xs px-1.5 py-0.5 rounded border border-zinc-200 bg-white text-zinc-700"
+                    />
+                    <span className="text-zinc-400 text-xs">to</span>
+                    <input
+                      type="number"
+                      value={residualYDomain.max}
+                      onChange={(e) =>
+                        setResidualYDomain((d) =>
+                          d ? { ...d, max: Number(e.target.value) || 0 } : null
+                        )
+                      }
+                      step="any"
+                      className="w-16 text-xs px-1.5 py-0.5 rounded border border-zinc-200 bg-white text-zinc-700"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setResidualYDomain(null)}
+                      className="text-xs px-2 py-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
+                    >
+                      Auto
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
             <p className="text-xs text-zinc-500 mb-3">
               Positive = underpredicting, negative = overpredicting. Mean residual indicates bias; spread indicates tail behaviour.
             </p>
@@ -650,12 +816,14 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
                   tick={{ fontSize: 9, fill: "#71717a" }}
                   tickFormatter={formatXTick}
                   interval="preserveStartEnd"
+                  ticks={midnightTicks}
                   stroke="#d4d4d8"
                   angle={-30}
                   textAnchor="end"
                   height={50}
                 />
                 <YAxis
+                  domain={residualYDomain ? [residualYDomain.min, residualYDomain.max] : undefined}
                   tick={{ fontSize: 10, fill: "#71717a" }}
                   stroke="#d4d4d8"
                   label={{

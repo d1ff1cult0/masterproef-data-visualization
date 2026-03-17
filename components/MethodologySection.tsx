@@ -21,6 +21,39 @@ function parseDate(s: string): number {
   return new Date(s + "T00:00:00Z").getTime();
 }
 
+/** Returns { x1, x2 } for ReferenceArea, using dates that exist in viewData so colors render when zoomed. */
+function getVisibleSegmentBounds(
+  viewData: { date?: string; [key: string]: unknown }[],
+  xDataKey: string,
+  segmentStart: string,
+  segmentEnd: string
+): { x1: string; x2: string } | null {
+  if (viewData.length === 0) return null;
+  const segStart = parseDate(segmentStart);
+  const segEnd = parseDate(segmentEnd);
+  const firstVisible = String(viewData[0]?.[xDataKey] ?? "");
+  const lastVisible = String(viewData[viewData.length - 1]?.[xDataKey] ?? "");
+  const visibleStart = firstVisible ? parseDate(firstVisible) : 0;
+  const visibleEnd = lastVisible ? parseDate(lastVisible) : 0;
+
+  const overlapStart = Math.max(visibleStart, segStart);
+  const overlapEnd = Math.min(visibleEnd, segEnd);
+  if (overlapStart >= overlapEnd) return null;
+
+  let x1: string | null = null;
+  let x2: string | null = null;
+  for (const d of viewData) {
+    const dateStr = String(d[xDataKey] ?? "");
+    if (!dateStr) continue;
+    const t = parseDate(dateStr);
+    if (t >= overlapStart && t <= overlapEnd) {
+      if (!x1) x1 = dateStr;
+      x2 = dateStr;
+    }
+  }
+  return x1 && x2 ? { x1, x2 } : null;
+}
+
 export default function MethodologySection() {
   const { dataSplit, sequenceConfig, modelConfig, trainingConfig } = METHODOLOGY;
   const [priceSeries, setPriceSeries] = useState<{ date: string; price: number }[]>([]);
@@ -116,64 +149,95 @@ export default function MethodologySection() {
                 })
               }
             >
-              <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
-              <XAxis
-                dataKey="date"
-                type="category"
-                tick={{ fontSize: 10, fill: "#71717a" }}
-                tickFormatter={(v) =>
-                  new Date(v + "T00:00:00Z").toLocaleDateString("en-GB", {
-                    month: "short",
-                    year: "2-digit",
-                  })
-                }
-              />
-              <YAxis
-                tick={{ fontSize: 10, fill: "#71717a" }}
-                tickFormatter={(v) => `${v}`}
-              />
-              <Tooltip
-                contentStyle={{
-                  fontSize: 11,
-                  backgroundColor: "#ffffff",
-                  border: "1px solid #e4e4e7",
-                  borderRadius: 6,
-                }}
-                labelFormatter={(label) =>
-                  new Date(label + "T00:00:00Z").toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })
-                }
-                formatter={(value: unknown) => [`€${Number(value ?? 0).toFixed(2)}`, "Daily avg"]}
-              />
-              <ReferenceArea
-                x1={dataSplit.trainStart}
-                x2={dataSplit.trainEnd}
-                fill={TRAIN_COLOR}
-                fillOpacity={0.2}
-              />
-              <ReferenceArea
-                x1={dataSplit.valStart}
-                x2={dataSplit.valEnd}
-                fill={VAL_COLOR}
-                fillOpacity={0.2}
-              />
-              <ReferenceArea
-                x1={dataSplit.testStart}
-                x2={dataSplit.testEnd}
-                fill={TEST_COLOR}
-                fillOpacity={0.2}
-              />
-              <Line
-                type="monotone"
-                dataKey="price"
-                stroke="#18181b"
-                strokeWidth={1.5}
-                dot={false}
-                connectNulls
-              />
+              {(viewData) => {
+                const trainBounds = getVisibleSegmentBounds(
+                  viewData,
+                  "date",
+                  dataSplit.trainStart,
+                  dataSplit.trainEnd
+                );
+                const valBounds = getVisibleSegmentBounds(
+                  viewData,
+                  "date",
+                  dataSplit.valStart,
+                  dataSplit.valEnd
+                );
+                const testBounds = getVisibleSegmentBounds(
+                  viewData,
+                  "date",
+                  dataSplit.testStart,
+                  dataSplit.testEnd
+                );
+                return (
+                  <>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
+                    <XAxis
+                      dataKey="date"
+                      type="category"
+                      tick={{ fontSize: 10, fill: "#71717a" }}
+                      tickFormatter={(v) =>
+                        new Date(v + "T00:00:00Z").toLocaleDateString("en-GB", {
+                          month: "short",
+                          year: "2-digit",
+                        })
+                      }
+                    />
+                    <YAxis
+                      tick={{ fontSize: 10, fill: "#71717a" }}
+                      tickFormatter={(v) => `${v}`}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        fontSize: 11,
+                        backgroundColor: "#ffffff",
+                        border: "1px solid #e4e4e7",
+                        borderRadius: 6,
+                      }}
+                      labelFormatter={(label) =>
+                        new Date(label + "T00:00:00Z").toLocaleDateString("en-GB", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })
+                      }
+                      formatter={(value: unknown) => [`€${Number(value ?? 0).toFixed(2)}`, "Daily avg"]}
+                    />
+                    {trainBounds && (
+                      <ReferenceArea
+                        x1={trainBounds.x1}
+                        x2={trainBounds.x2}
+                        fill={TRAIN_COLOR}
+                        fillOpacity={0.2}
+                      />
+                    )}
+                    {valBounds && (
+                      <ReferenceArea
+                        x1={valBounds.x1}
+                        x2={valBounds.x2}
+                        fill={VAL_COLOR}
+                        fillOpacity={0.2}
+                      />
+                    )}
+                    {testBounds && (
+                      <ReferenceArea
+                        x1={testBounds.x1}
+                        x2={testBounds.x2}
+                        fill={TEST_COLOR}
+                        fillOpacity={0.2}
+                      />
+                    )}
+                    <Line
+                      type="monotone"
+                      dataKey="price"
+                      stroke="#18181b"
+                      strokeWidth={1.5}
+                      dot={false}
+                      connectNulls
+                      isAnimationActive={false}
+                    />
+                  </>
+                );
+              }}
             </ZoomableTimeSeriesChart>
           ) : (
             <div className="relative h-10 bg-zinc-100 rounded overflow-hidden">

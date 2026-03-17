@@ -206,8 +206,8 @@ export default function MetricsView({ selectedModels }: MetricsViewProps) {
         </div>
       )}
 
-      {/* Radar chart */}
-      {radarData.length > 0 && modelMetrics.length <= 8 && (
+      {/* Radar chart — only when viewing a single model */}
+      {radarData.length > 0 && modelMetrics.length === 1 && (
         <div className="border border-zinc-200 rounded-lg p-4 bg-white">
           <h3 className="text-sm font-medium text-zinc-700 mb-4">
             Multi-Metric Radar Comparison
