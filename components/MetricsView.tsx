@@ -23,6 +23,7 @@ import {
 import type { SelectedModel, MetricsResponse, RunMetrics } from "@/lib/types";
 import { METRIC_LABELS, KEY_METRICS } from "@/lib/types";
 import { pairedTTest } from "@/lib/stats";
+import { ExportableChart } from "./ExportableChart";
 
 interface MetricsViewProps {
   selectedModels: SelectedModel[];
@@ -208,10 +209,8 @@ export default function MetricsView({ selectedModels }: MetricsViewProps) {
 
       {/* Radar chart — only when viewing a single model */}
       {radarData.length > 0 && modelMetrics.length === 1 && (
+        <ExportableChart title="Multi-Metric Radar Comparison" filename="radar-chart">
         <div className="border border-zinc-200 rounded-lg p-4 bg-white">
-          <h3 className="text-sm font-medium text-zinc-700 mb-4">
-            Multi-Metric Radar Comparison
-          </h3>
           <ResponsiveContainer width="100%" height={300}>
             <RadarChart data={radarData}>
               <PolarGrid stroke="#e4e4e7" />
@@ -235,11 +234,13 @@ export default function MetricsView({ selectedModels }: MetricsViewProps) {
             </RadarChart>
           </ResponsiveContainer>
         </div>
+        </ExportableChart>
       )}
 
       {/* Scatter: Training time vs metric */}
+      <ExportableChart title="Training Time vs Metric" filename="scatter-chart">
       <div className="border border-zinc-200 rounded-lg p-4 bg-white">
-        <div className="flex items-center justify-between mb-3">
+        <div className="chart-export-exclude flex items-center justify-between mb-3">
           <h3 className="text-sm font-medium text-zinc-700">
             Training Time vs Metric
           </h3>
@@ -302,6 +303,7 @@ export default function MetricsView({ selectedModels }: MetricsViewProps) {
           </ScatterChart>
         </ResponsiveContainer>
       </div>
+      </ExportableChart>
 
       {/* Paired t-test results */}
       {tTestResults.length > 0 && (
@@ -435,13 +437,12 @@ export default function MetricsView({ selectedModels }: MetricsViewProps) {
           }));
 
           return (
-            <div
+            <ExportableChart
               key={metric}
-              className="border border-zinc-200 rounded-lg p-4 bg-white"
+              title={meta?.label ?? metric}
+              filename={`metric-${metric}`}
             >
-              <h3 className="text-xs font-medium text-zinc-600 mb-3">
-                {meta?.label ?? metric}
-              </h3>
+            <div className="border border-zinc-200 rounded-lg p-4 bg-white">
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={barData} layout="vertical" margin={{ left: 10, right: 20, top: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
@@ -474,6 +475,7 @@ export default function MetricsView({ selectedModels }: MetricsViewProps) {
                 </BarChart>
               </ResponsiveContainer>
             </div>
+            </ExportableChart>
           );
         })}
       </div>

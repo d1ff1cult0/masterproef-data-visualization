@@ -11,6 +11,7 @@ import {
   ReferenceArea,
 } from "recharts";
 import { ZoomableTimeSeriesChart } from "./ZoomableTimeSeriesChart";
+import { ExportableChart } from "./ExportableChart";
 import { METHODOLOGY } from "@/lib/methodology";
 
 const TRAIN_COLOR = "#2563eb";
@@ -126,10 +127,8 @@ export default function MethodologySection() {
       </div>
 
       {/* Data split timeline with price time series */}
+      <ExportableChart title="Data Split Timeline" filename="data-split-timeline">
       <div className="border border-zinc-200 rounded-lg p-4 bg-white">
-        <h3 className="text-sm font-medium text-zinc-700 mb-4">
-          Data Split Timeline
-        </h3>
         <div className="space-y-3">
           {loading ? (
             <div className="h-48 flex items-center justify-center text-sm text-zinc-500">
@@ -255,7 +254,7 @@ export default function MethodologySection() {
               ))}
             </div>
           )}
-          <div className="flex flex-wrap gap-6 text-xs">
+          <div className="chart-export-exclude flex flex-wrap gap-6 text-xs">
             {segments.map((seg) => (
               <div key={seg.label} className="flex items-center gap-2">
                 <span
@@ -281,6 +280,7 @@ export default function MethodologySection() {
           </div>
         </div>
       </div>
+      </ExportableChart>
 
       {/* Parameters tables */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -21,6 +21,7 @@ import {
 } from "recharts";
 import type { EDAResult, SummaryStatRow } from "@/lib/eda";
 import { ZoomableTimeSeriesChart } from "./ZoomableTimeSeriesChart";
+import { ExportableChart } from "./ExportableChart";
 
 // ──────────────────── Color Utilities ────────────────────
 
@@ -255,8 +256,8 @@ export default function EDAView() {
       {/* ────── 3. Price Time Series ────── */}
       {S("timeseries", "Price Time Series", "Daily average with 7-day rolling mean/std", (
         <div className="space-y-6">
+          <ExportableChart title="Daily Average Price with Rolling Mean & Std Band" filename="price-timeseries">
           <div>
-            <h4 className="text-xs font-medium text-zinc-600 mb-2">Daily Average Price with Rolling Mean & Std Band</h4>
             <ZoomableTimeSeriesChart data={data.priceSeries} xDataKey="date" height={350} formatXLabel={(v) => v.slice(5)}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v: string) => v.slice(5)} interval={Math.floor(data.priceSeries.length / 12)} />
@@ -267,8 +268,9 @@ export default function EDAView() {
               <Legend wrapperStyle={{ fontSize: 11 }} />
             </ZoomableTimeSeriesChart>
           </div>
+          </ExportableChart>
+          <ExportableChart title="7-Day Rolling Standard Deviation" filename="rolling-std">
           <div>
-            <h4 className="text-xs font-medium text-zinc-600 mb-2">7-Day Rolling Standard Deviation</h4>
             <ZoomableTimeSeriesChart data={data.priceSeries} xDataKey="date" height={200} chartType="LineChart" formatXLabel={(v) => v.slice(5)}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v: string) => v.slice(5)} interval={Math.floor(data.priceSeries.length / 12)} />
@@ -277,8 +279,9 @@ export default function EDAView() {
               <Line dataKey="rollingStd" stroke={COLORS.orange} strokeWidth={1.5} dot={false} name="7d Rolling Std" />
             </ZoomableTimeSeriesChart>
           </div>
+          </ExportableChart>
+          <ExportableChart title="Monthly Average Prices" filename="monthly-avg-prices">
           <div>
-            <h4 className="text-xs font-medium text-zinc-600 mb-2">Monthly Average Prices</h4>
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={data.monthlyAvgPrices}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -291,6 +294,7 @@ export default function EDAView() {
               </BarChart>
             </ResponsiveContainer>
           </div>
+          </ExportableChart>
         </div>
       ))}
 

@@ -19,6 +19,7 @@ import {
   EXPERIMENT_NOTEBOOK_MAP,
 } from "@/lib/types";
 import MethodologySection from "./MethodologySection";
+import { ExportableChart } from "./ExportableChart";
 
 interface BestModelEntry {
   experiment: string;
@@ -266,11 +267,8 @@ export default function BestModelsLanding({ onCompareInDashboard }: BestModelsLa
       {/* Bar charts for key metrics */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {barDataByMetric.map(({ metric, label, data }) => (
-          <div
-            key={metric}
-            className="border border-zinc-200 rounded-lg p-4 bg-white"
-          >
-            <h3 className="text-sm font-medium text-zinc-700 mb-3">{label}</h3>
+          <ExportableChart key={metric} title={label} filename={`best-models-${metric}`}>
+          <div className="border border-zinc-200 rounded-lg p-4 bg-white">
             <ResponsiveContainer width="100%" height={220}>
               <BarChart
                 data={data}
@@ -317,6 +315,7 @@ export default function BestModelsLanding({ onCompareInDashboard }: BestModelsLa
               </BarChart>
             </ResponsiveContainer>
           </div>
+          </ExportableChart>
         ))}
       </div>
 

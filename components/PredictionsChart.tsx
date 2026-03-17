@@ -20,6 +20,7 @@ import {
 import type { SelectedModel, PredictionResponse, PredictionPoint } from "@/lib/types";
 import { computeExtremeEventStats } from "@/lib/extreme-events";
 import ExtremeEventStatsCard from "./ExtremeEventStatsCard";
+import { ExportableChart } from "./ExportableChart";
 
 interface PredictionsChartProps {
   selectedModels: SelectedModel[];
@@ -584,8 +585,9 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
       ) : (
         <>
           {/* Main chart */}
+          <ExportableChart title="Predictions vs Actual Prices" filename="predictions-chart">
           <div className="border border-zinc-200 rounded-lg p-4 bg-white">
-            <div className="text-xs text-zinc-400 mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div className="chart-export-exclude text-xs text-zinc-400 mb-2 flex flex-wrap items-center justify-between gap-2">
               <span>
                 {isZoomed
                   ? `Zoomed: ${viewData[0]?.date ?? ""} to ${viewData[viewData.length - 1]?.date ?? ""} (${viewData.length} points) — drag to zoom further, or reset`
@@ -742,10 +744,12 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
               </ComposedChart>
             </ResponsiveContainer>
           </div>
+          </ExportableChart>
 
           {/* Residuals: time series (bias + tail behaviour) */}
+          <ExportableChart title="Residuals (Actual − Predicted)" filename="residuals-chart">
           <div className="border border-zinc-200 rounded-lg p-4 bg-white">
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <div className="chart-export-exclude flex flex-wrap items-center justify-between gap-2 mb-2">
               <h3 className="text-sm font-medium text-zinc-700">
                 Residuals (Actual − Predicted)
               </h3>
@@ -802,7 +806,7 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
                 )}
               </div>
             </div>
-            <p className="text-xs text-zinc-500 mb-3">
+            <p className="chart-export-exclude text-xs text-zinc-500 mb-3">
               Positive = underpredicting, negative = overpredicting. Mean residual indicates bias; spread indicates tail behaviour.
             </p>
             <ResponsiveContainer width="100%" height={280}>
@@ -858,7 +862,7 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
               </ComposedChart>
             </ResponsiveContainer>
             {residualMeans.length > 0 && (
-              <div className="flex flex-wrap gap-4 mt-2 text-xs">
+              <div className="chart-export-exclude flex flex-wrap gap-4 mt-2 text-xs">
                 {residualMeans.map(({ label, color, mean }) => (
                   <span key={label} className="flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
@@ -871,14 +875,13 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
               </div>
             )}
           </div>
+          </ExportableChart>
 
           {/* Residual distribution histogram (tail behaviour) */}
           {histogramData.length > 0 && (
+            <ExportableChart title="Residual Distribution" filename="residual-histogram">
             <div className="border border-zinc-200 rounded-lg p-4 bg-white">
-              <h3 className="text-sm font-medium text-zinc-700 mb-2">
-                Residual Distribution
-              </h3>
-              <p className="text-xs text-zinc-500 mb-3">
+              <p className="chart-export-exclude text-xs text-zinc-500 mb-3">
                 Histogram of residuals. Heavy tails or skew indicate asymmetric prediction errors.
               </p>
               <ResponsiveContainer width="100%" height={220}>
@@ -935,6 +938,7 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
                 </BarChart>
               </ResponsiveContainer>
             </div>
+            </ExportableChart>
           )}
 
           {extremeEventStats && <ExtremeEventStatsCard stats={extremeEventStats} />}
@@ -986,8 +990,9 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
 
           {/* Overview when zoomed */}
           {isZoomed && (
+            <ExportableChart title="Zoom Overview" filename="zoom-overview">
             <div className="border border-zinc-200 rounded-lg p-4 bg-white">
-              <div className="flex items-center justify-between mb-2">
+              <div className="chart-export-exclude flex items-center justify-between mb-2">
                 <span className="text-xs text-zinc-400">Slider window overview — click to reset zoom</span>
               </div>
               <div className="cursor-pointer" onClick={resetZoom}>
@@ -1033,6 +1038,7 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
                 </ResponsiveContainer>
               </div>
             </div>
+            </ExportableChart>
           )}
 
           <div className="text-xs text-zinc-400 text-center">

@@ -187,7 +187,6 @@ export function ZoomableTimeSeriesChart({
           onMouseDown={handleMouseDown as never}
           onMouseMove={handleMouseMove as never}
           onMouseUp={handleMouseUp as never}
-          isAnimationActive={false}
         >
           {chartChildren}
           {zoomLeft != null && zoomRight != null && (
