@@ -611,38 +611,49 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
                     </button>
                   </>
                 ) : (
-                  <>
-                    <input
-                      type="number"
-                      value={priceYDomain.min}
-                      onChange={(e) =>
-                        setPriceYDomain((d) =>
-                          d ? { ...d, min: Number(e.target.value) || 0 } : null
-                        )
-                      }
-                      step="any"
-                      className="w-16 text-xs px-1.5 py-0.5 rounded border border-zinc-200 bg-white text-zinc-700"
-                    />
-                    <span className="text-zinc-400">to</span>
-                    <input
-                      type="number"
-                      value={priceYDomain.max}
-                      onChange={(e) =>
-                        setPriceYDomain((d) =>
-                          d ? { ...d, max: Number(e.target.value) || 0 } : null
-                        )
-                      }
-                      step="any"
-                      className="w-16 text-xs px-1.5 py-0.5 rounded border border-zinc-200 bg-white text-zinc-700"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setPriceYDomain(null)}
-                      className="text-xs px-2 py-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
-                    >
-                      Auto
-                    </button>
-                  </>
+                  priceYExtent && (
+                    <>
+                      <div className="flex items-center gap-2" title="Drag min/max to zoom Y range (within auto scale)">
+                        <span className="text-zinc-500 text-xs shrink-0 w-10 tabular-nums">{priceYDomain.min.toFixed(0)}</span>
+                        <input
+                          type="range"
+                          min={priceYExtent.min}
+                          max={Math.max(priceYExtent.min, priceYDomain.max - (priceYExtent.max - priceYExtent.min) * 0.01)}
+                          value={priceYDomain.min}
+                          step={(priceYExtent.max - priceYExtent.min) / 200}
+                          onChange={(e) =>
+                            setPriceYDomain((d) =>
+                              d ? { ...d, min: Number(e.target.value) } : null
+                            )
+                          }
+                          className="w-16 h-1.5 accent-zinc-500"
+                          aria-label="Y min"
+                        />
+                        <input
+                          type="range"
+                          min={Math.min(priceYExtent.max, priceYDomain.min + (priceYExtent.max - priceYExtent.min) * 0.01)}
+                          max={priceYExtent.max}
+                          value={priceYDomain.max}
+                          step={(priceYExtent.max - priceYExtent.min) / 200}
+                          onChange={(e) =>
+                            setPriceYDomain((d) =>
+                              d ? { ...d, max: Number(e.target.value) } : null
+                            )
+                          }
+                          className="w-16 h-1.5 accent-zinc-500"
+                          aria-label="Y max"
+                        />
+                        <span className="text-zinc-500 text-xs shrink-0 w-10 tabular-nums">{priceYDomain.max.toFixed(0)}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPriceYDomain(null)}
+                        className="text-xs px-2 py-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors shrink-0"
+                      >
+                        Auto
+                      </button>
+                    </>
+                  )
                 )}
               </div>
             </div>
@@ -771,38 +782,49 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
                     </button>
                   </>
                 ) : (
-                  <>
-                    <input
-                      type="number"
-                      value={residualYDomain.min}
-                      onChange={(e) =>
-                        setResidualYDomain((d) =>
-                          d ? { ...d, min: Number(e.target.value) || 0 } : null
-                        )
-                      }
-                      step="any"
-                      className="w-16 text-xs px-1.5 py-0.5 rounded border border-zinc-200 bg-white text-zinc-700"
-                    />
-                    <span className="text-zinc-400 text-xs">to</span>
-                    <input
-                      type="number"
-                      value={residualYDomain.max}
-                      onChange={(e) =>
-                        setResidualYDomain((d) =>
-                          d ? { ...d, max: Number(e.target.value) || 0 } : null
-                        )
-                      }
-                      step="any"
-                      className="w-16 text-xs px-1.5 py-0.5 rounded border border-zinc-200 bg-white text-zinc-700"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setResidualYDomain(null)}
-                      className="text-xs px-2 py-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
-                    >
-                      Auto
-                    </button>
-                  </>
+                  residualYExtent && (
+                    <>
+                      <div className="flex items-center gap-2" title="Drag min/max to zoom Y range (within auto scale)">
+                        <span className="text-zinc-500 text-xs shrink-0 w-10 tabular-nums">{residualYDomain.min.toFixed(0)}</span>
+                        <input
+                          type="range"
+                          min={residualYExtent.min}
+                          max={Math.max(residualYExtent.min, residualYDomain.max - (residualYExtent.max - residualYExtent.min) * 0.01)}
+                          value={residualYDomain.min}
+                          step={(residualYExtent.max - residualYExtent.min) / 200}
+                          onChange={(e) =>
+                            setResidualYDomain((d) =>
+                              d ? { ...d, min: Number(e.target.value) } : null
+                            )
+                          }
+                          className="w-16 h-1.5 accent-zinc-500"
+                          aria-label="Y min"
+                        />
+                        <input
+                          type="range"
+                          min={Math.min(residualYExtent.max, residualYDomain.min + (residualYExtent.max - residualYExtent.min) * 0.01)}
+                          max={residualYExtent.max}
+                          value={residualYDomain.max}
+                          step={(residualYExtent.max - residualYExtent.min) / 200}
+                          onChange={(e) =>
+                            setResidualYDomain((d) =>
+                              d ? { ...d, max: Number(e.target.value) } : null
+                            )
+                          }
+                          className="w-16 h-1.5 accent-zinc-500"
+                          aria-label="Y max"
+                        />
+                        <span className="text-zinc-500 text-xs shrink-0 w-10 tabular-nums">{residualYDomain.max.toFixed(0)}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setResidualYDomain(null)}
+                        className="text-xs px-2 py-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors shrink-0"
+                      >
+                        Auto
+                      </button>
+                    </>
+                  )
                 )}
               </div>
             </div>

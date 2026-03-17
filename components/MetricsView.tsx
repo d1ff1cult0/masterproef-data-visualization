@@ -13,11 +13,6 @@ import {
   ScatterChart,
   Scatter,
   ZAxis,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
   Legend,
 } from "recharts";
 import type { SelectedModel, MetricsResponse, RunMetrics } from "@/lib/types";
@@ -91,41 +86,6 @@ export default function MetricsView({ selectedModels }: MetricsViewProps) {
       };
     });
   }, [modelMetrics, scatterMetric]);
-
-  const radarMetrics = useMemo(() => {
-    return KEY_METRICS.filter((k) =>
-      modelMetrics.some((m) => (m.summary?.avg?.[k] ?? m.runs[0]?.[k]) != null)
-    );
-  }, [modelMetrics]);
-
-  const radarData = useMemo(() => {
-    if (radarMetrics.length === 0) return [];
-    const maxByMetric: Record<string, number> = {};
-    const minByMetric: Record<string, number> = {};
-    for (const k of radarMetrics) {
-      const meta = METRIC_LABELS[k];
-      const vals = modelMetrics
-        .map((m) => m.summary?.avg?.[k] ?? m.runs[0]?.[k])
-        .filter((v): v is number => v != null);
-      if (vals.length === 0) continue;
-      maxByMetric[k] = Math.max(...vals);
-      minByMetric[k] = Math.min(...vals);
-    }
-    return radarMetrics.map((metric) => {
-      const meta = METRIC_LABELS[metric];
-      const obj: Record<string, string | number> = { metric: meta?.label ?? metric };
-      const max = maxByMetric[metric] ?? 1;
-      const min = minByMetric[metric] ?? 0;
-      const range = Math.max(max - min, 1e-9);
-      modelMetrics.forEach((m, i) => {
-        const v = m.summary?.avg?.[metric] ?? m.runs[0]?.[metric];
-        if (v != null) {
-          obj[`m${i}`] = meta?.lowerBetter ? (max - v) / range : (v - min) / range;
-        }
-      });
-      return obj;
-    });
-  }, [modelMetrics, radarMetrics]);
 
   const tTestResults = useMemo(() => {
     const results: { metric: string; modelA: string; modelB: string; result: NonNullable<ReturnType<typeof pairedTTest>> }[] = [];
@@ -205,36 +165,6 @@ export default function MetricsView({ selectedModels }: MetricsViewProps) {
             </button>
           ))}
         </div>
-      )}
-
-      {/* Radar chart — only when viewing a single model */}
-      {radarData.length > 0 && modelMetrics.length === 1 && (
-        <ExportableChart title="Multi-Metric Radar Comparison" filename="radar-chart">
-        <div className="border border-zinc-200 rounded-lg p-4 bg-white">
-          <ResponsiveContainer width="100%" height={300}>
-            <RadarChart data={radarData}>
-              <PolarGrid stroke="#e4e4e7" />
-              <PolarAngleAxis
-                dataKey="metric"
-                tick={{ fontSize: 10, fill: "#71717a" }}
-              />
-              <PolarRadiusAxis angle={90} domain={[0, 1]} tick={{ fontSize: 9 }} />
-              {modelMetrics.map((m, i) => (
-                <Radar
-                  key={m.key}
-                  name={m.label}
-                  dataKey={`m${i}`}
-                  stroke={m.color}
-                  fill={m.color}
-                  fillOpacity={0.2}
-                  strokeWidth={1.5}
-                />
-              ))}
-              <Legend />
-            </RadarChart>
-          </ResponsiveContainer>
-        </div>
-        </ExportableChart>
       )}
 
       {/* Scatter: Training time vs metric */}

@@ -112,5 +112,6 @@ export const EXPERIMENT_NOTEBOOK_MAP: Record<string, number> = {
   moe_comparison: 9,
   directions_210: 10,
   rolling_evaluation: 11,
+  levy_processes_study: 12,
   transformer_grid_search: 2,
 };

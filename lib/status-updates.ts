@@ -941,6 +941,35 @@ export const STATUS_UPDATES: StatusUpdate[] = [
         type: "paragraph",
         text: "After aligning the methodology and re-running experiments, the results are now consistently closer to MAE values around 20, which is in line with what one would expect given the more recent and potentially more volatile test period. This confirms that the refactoring did not introduce a systematic error; the apparent performance drop was attributable to the different evaluation setup rather than to the modular codebase itself.",
       },
+      {
+        type: "paragraph",
+        text: "Summary across 10 runs:",
+      },
+      {
+        type: "table",
+        table: {
+          caption: "Summary across 10 runs (mean ± std).",
+          headers: ["Metric", "Value"],
+          rows: [
+            ["MPIW", "77.91 (± 7.65)"],
+            ["PINAW", "0.216 (± 0.021)"],
+            ["PICP", "0.897 (± 0.032)"],
+            ["Interval Score", "104.72 (± 4.70)"],
+            ["CWC", "127.92 (± 42.22)"],
+            ["Energy Score", "13.43 (± 0.49)"],
+            ["MAE", "18.75 (± 0.78)"],
+            ["RMSE", "24.85 (± 0.93)"],
+            ["MAPE", "1479.57 (± 121.92)"],
+            ["sMAPE", "33.88 (± 1.46)"],
+            ["MAD", "14.55 (± 0.70)"],
+            ["rMAE", "0.227 (± 0.009)"],
+          ],
+        },
+      },
+      {
+        type: "paragraph",
+        text: "Although these values are indeed higher than the original values mentioned in the first few status updates (which is probably due to the train/val/test split, as expected), they are still a bit lower than the code after refactoring. This indicates that I might have made a mistake somewhere, which I will need to investigate further.",
+      },
       { type: "heading", level: 2, text: "Notebook 9: Mixture-of-Experts Transformer Comparison" },
       {
         type: "paragraph",
