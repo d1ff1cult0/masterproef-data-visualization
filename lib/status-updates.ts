@@ -991,12 +991,12 @@ export const STATUS_UPDATES: StatusUpdate[] = [
         type: "table",
         table: {
           caption: "Loss functions and ensemble comparison (Notebook 10).",
-          headers: ["Approach", "MAE", "PICP"],
+          headers: ["Approach", "MAE", "RMSE", "CRPS", "PICP", "MPIW"],
           rows: [
-            ["Quantile avg ensemble", 18.56, 0.958],
-            ["Quantile (Pinball)", 19.91, 0.902],
-            ["Johnson SU (NLL)", 19.98, 0.905],
-            ["Gaussian CRPS", 20.72, 0.834],
+            ["Quantile avg ensemble", 18.56, "—", "—", 0.958, 103.6],
+            ["Quantile (Pinball)", 19.91, 26.47, 14.66, 0.902, 94.9],
+            ["Johnson SU (NLL)", 19.98, 26.74, 14.30, 0.905, 93.9],
+            ["Gaussian CRPS", 20.72, 27.46, 15.32, 0.834, 72.6],
           ],
         },
       },
