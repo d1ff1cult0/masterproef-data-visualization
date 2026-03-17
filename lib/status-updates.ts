@@ -921,29 +921,17 @@ export const STATUS_UPDATES: StatusUpdate[] = [
   {
     id: "06",
     number: 6,
-    title: "MAE Investigation, Notebooks 9 & 10, and Thesis Progress",
-    date: "Experimental results, head discrepancy, literature and writing",
+    title: "MAE diff investigation, notebooks 9, 10 & 12, and writing progress",
+    date: "",
     content: [
       {
         type: "paragraph",
-        text: "A brief note: I did not really know what to do after implementing notebooks 9–12, and I could not spend a lot of time on the thesis since the last meeting, as I helped organise VTK's jobfair last week.",
+        text: "I struggled in the first semester with visualizing and comparing the results of all my models—metrics don't tell you everything, they don't tell you when the model performs well or badly, just how it performs overall. I thought about making a dashboard back then but deemed it a bit out of scope for the thesis. When I saw Clément's dashboard though, I was sold on the idea, so I made this one (obviously with the help of AI) and I've found it really valuable already for visualizing and interpreting my data. I'm also not a big fan of LaTeX, so I found it a better and more organized solution to put the status updates here as well.",
       },
       { type: "heading", level: 2, text: "MAE Difference Investigation" },
       {
         type: "paragraph",
-        text: "Following the concerns raised in the previous status update about models performing worse after the refactoring (MAE around 20–25 instead of the 10–12 observed in earlier experiments), I investigated the cause of this discrepancy.",
-      },
-      {
-        type: "paragraph",
-        text: "I compared the experimental setup before and after the refactoring, focusing on the train/test split and evaluation methodology. The key finding is that the difference was indeed likely due to the different training and test sets used in the two setups. The pre-refactoring experiments used a different temporal split (e.g. training on 2023–2025 data with a shorter test window), whereas the refactored pipeline uses a fixed split: training from 2023-02-01, validation as the last 10% of the training period, and the test set as the last 6 months of the dataset (approximately August 2025 to February 2026).",
-      },
-      {
-        type: "paragraph",
-        text: "After aligning the methodology and re-running experiments, the results are now consistently closer to MAE values around 20, which is in line with what one would expect given the more recent and potentially more volatile test period. This confirms that the refactoring did not introduce a systematic error; the apparent performance drop was attributable to the different evaluation setup rather than to the modular codebase itself.",
-      },
-      {
-        type: "paragraph",
-        text: "Summary across 10 runs:",
+        text: "I reran the old code with the same train/val/test set and the same hyperparameters. As expected, the resulting MAE is worse than the 11–14 seen in the first semester, but it is still better than all of the basic transformers I have trained with the refactored code. I first thought this might be due to the expanding window retraining done in the pre-refactored code, so I implemented notebook 11 to test this. There still seems to be a slight advantage for the old model though, so I will need to investigate further to really understand where the difference comes from.",
       },
       {
         type: "table",
@@ -951,29 +939,20 @@ export const STATUS_UPDATES: StatusUpdate[] = [
           caption: "Summary across 10 runs (mean ± std).",
           headers: ["Metric", "Value"],
           rows: [
-            ["MPIW", "77.91 (± 7.65)"],
-            ["PINAW", "0.216 (± 0.021)"],
-            ["PICP", "0.897 (± 0.032)"],
-            ["Interval Score", "104.72 (± 4.70)"],
-            ["CWC", "127.92 (± 42.22)"],
-            ["Energy Score", "13.43 (± 0.49)"],
             ["MAE", "18.75 (± 0.78)"],
             ["RMSE", "24.85 (± 0.93)"],
-            ["MAPE", "1479.57 (± 121.92)"],
-            ["sMAPE", "33.88 (± 1.46)"],
             ["MAD", "14.55 (± 0.70)"],
-            ["rMAE", "0.227 (± 0.009)"],
+            ["CRPS", "13.43 (± 0.49)"],
+            ["MPIW", "77.91 (± 7.65)"],
+            ["PICP", "0.897 (± 0.032)"],
+            ["Interval Score", "104.72 (± 4.70)"],
           ],
         },
       },
+      { type: "heading", level: 2, text: "Notebook 9: Mixture-of-Experts" },
       {
         type: "paragraph",
-        text: "Although these values are indeed higher than the original values mentioned in the first few status updates (which is probably due to the train/val/test split, as expected), they are still a bit lower than the code after refactoring. This indicates that I might have made a mistake somewhere, which I will need to investigate further.",
-      },
-      { type: "heading", level: 2, text: "Notebook 9: Mixture-of-Experts Transformer Comparison" },
-      {
-        type: "paragraph",
-        text: "Notebook 9 compares the standard Probabilistic Transformer (Johnson SU head) against a Mixture-of-Experts (MoE) architecture and a shared-backbone mixture head. The key distinction is architectural: the Mixture JSU model uses a single backbone with a mixture of Johnson SU distributions at the output (shared representation, specialisation only at the parameter level), whereas the MoE Transformer uses separate expert networks with a gating mechanism, allowing each expert to specialise in distinct price regimes (e.g. normal, spike, low-negative).",
+        text: "Notebook 9 compares the standard Transformer (Johnson SU) against a Mixture-of-Experts setup and a shared-backbone mixture head. The Mixture JSU (3 components) model does best on MAE, RMSE and CRPS. The MoE architecture with separate experts doesn't beat the simpler shared-backbone mixture, so the extra complexity doesn't seem to pay off for this dataset.",
       },
       {
         type: "table",
@@ -988,14 +967,10 @@ export const STATUS_UPDATES: StatusUpdate[] = [
           ],
         },
       },
+      { type: "heading", level: 2, text: "Notebook 10: CRPS, Conformal, Ensemble" },
       {
         type: "paragraph",
-        text: "The Mixture JSU (3 components) model outperforms both the baseline and the MoE variants on MAE, RMSE, and CRPS. The MoE architecture, despite its potential for regime-specific specialisation, does not improve over the simpler shared-backbone mixture. This suggests that for this dataset and setup, the added complexity of separate experts and gating does not yield a benefit; the mixture head with a shared backbone is sufficient to capture the multi-modal or skewed nature of electricity prices.",
-      },
-      { type: "heading", level: 2, text: "Notebook 10: CRPS, Conformal Prediction, and Ensemble" },
-      {
-        type: "paragraph",
-        text: "Notebook 10 explores three directions: (1) training with CRPS or Pinball loss instead of NLL, (2) conformal prediction for finite-sample coverage guarantees, and (3) ensemble methods (quantile averaging and stacking).",
+        text: "Notebook 10 looks at CRPS/Pinball loss, conformal prediction, and ensembles. Quantile averaging of the top models from notebook 8 gives the best MAE (18.56) and PICP (0.958). Quantile and Johnson SU perform similarly on MAE; Johnson SU has slightly better PICP. Conformal prediction hits the target coverage but with wider intervals and higher MAE.",
       },
       {
         type: "table",
@@ -1012,47 +987,41 @@ export const STATUS_UPDATES: StatusUpdate[] = [
           ],
         },
       },
+      { type: "heading", level: 2, text: "Notebook 12: Lévy Processes" },
       {
         type: "paragraph",
-        text: "Quantile averaging of the top models from Notebook 8 achieves the best MAE (18.56) and excellent PICP (0.958), demonstrating that combining diverse probabilistic forecasts improves both point accuracy and calibration. Quantile (Pinball) and Johnson SU (NLL) perform similarly on MAE; Johnson SU has slightly better PICP and the lowest CRPS among single models. Gaussian CRPS training underperforms on both MAE and PICP. Conformal prediction achieves the target coverage (PICP 0.953) as expected from its theoretical guarantees, but at the cost of wider intervals and higher MAE. Notebook 11 (Rolling Retrain vs. Finetune) is still running; results will be reported in a future update.",
-      },
-      { type: "heading", level: 2, text: "Quantile vs. Johnson SU Head: Notebook 6 vs. Notebook 4" },
-      {
-        type: "paragraph",
-        text: "In Notebook 6, the Transformer with a quantile head achieves MAE 20.96, slightly better than the Transformer with a Johnson SU head (MAE 21.75). In contrast, Notebook 4 finds that Johnson SU mixture heads dominate the top rankings, while quantile heads rank below them.",
+        text: "Notebook 12 experiments with Lévy jump-diffusion processes in the Hybrid Transformer + SDE setup. It adds compound Poisson jumps on top of the OU diffusion: Gaussian jumps (symmetric, light tails), Laplace jumps (heavier tails), and asymmetric jumps (larger upward spikes than downward).",
       },
       {
-        type: "paragraph",
-        text: "This apparent contradiction can be explained by the different optimisation setups:",
-      },
-      {
-        type: "orderedList",
-        items: [
-          "Notebook 4 uses fixed, canonical hyperparameters for all head types. The hyperparameters were originally tuned for a Gaussian or standard output head. Under these fixed settings, the Johnson SU and mixture heads perform better because they are better suited to the skewed, heavy-tailed price distribution without requiring head-specific tuning.",
-          "Notebook 6 uses Optuna to optimise each model independently. The quantile head and the Johnson SU head each receive their own hyperparameter search. Optuna may have found a configuration that suits the quantile head particularly well (e.g. different learning rate, number of quantiles, or architecture choices), whereas the Johnson SU head may not have been optimised as effectively within the same search budget.",
-        ],
+        type: "table",
+        table: {
+          caption: "Lévy process comparison (Notebook 12).",
+          headers: ["Model", "MAE", "RMSE", "CRPS", "PICP", "MPIW", "Interval Score"],
+          rows: [
+            ["Hybrid + OU + Jump (Gaussian)", 19.76, 26.62, 14.25, 0.922, 97.1, 144.4],
+            ["Hybrid (Transformer+OU)", 20.26, 27.04, 14.58, 0.935, 107.3, 146.5],
+            ["Hybrid + OU + Laplace Jump", 20.62, 27.32, 14.67, 0.935, 106.9, 143.7],
+            ["Hybrid + Asymmetric Jump", 21.19, 27.71, 19.79, 0.996, 251.9, 253.8],
+          ],
+        },
       },
       {
         type: "paragraph",
-        text: "In other words, the quantile head can benefit from head-specific hyperparameters that Optuna discovers when optimising for it directly. When all heads share the same hyperparameters (Notebook 4), the distributional heads (Johnson SU, mixtures) perform better because they match the price distribution more naturally. The takeaway is that fair comparison requires either (a) optimising each head type separately, or (b) using a common hyperparameter set; the current discrepancy reflects the difference between these two protocols.",
+        text: "The Gaussian jump model does best on MAE and CRPS—a small improvement over the baseline OU-only model. Laplace jumps don't add much. The asymmetric jump model has very high PICP (99.6%) but much wider intervals and worse MAE/CRPS, so it over-predicts uncertainty and doesn't help.",
       },
-      { type: "heading", level: 2, text: "Literature Review and Thesis Writing" },
+      { type: "heading", level: 2, text: "Quantile vs. Johnson SU (Notebook 6 vs. 4)" },
       {
         type: "paragraph",
-        text: "I have incorporated the feedback from Stefano and Chris into my literature study. Their suggestions have helped refine the structure and emphasis of the related work, particularly regarding the positioning of probabilistic forecasting methods and the role of Transformers in time series.",
+        text: "Notebook 6 finds the quantile head slightly better than Johnson SU; notebook 4 finds the opposite. The difference comes from the optimisation: notebook 4 uses fixed hyperparameters for all heads, while notebook 6 optimises each model separately with Optuna. So the quantile head benefits from head-specific tuning; with shared hyperparameters, Johnson SU does better because it fits the price distribution more naturally.",
+      },
+      { type: "heading", level: 2, text: "Literature and Writing" },
+      {
+        type: "paragraph",
+        text: "I've incorporated feedback from Stefano and Chris into the literature study. I've also started writing the first chapter on the Belgian electricity market data analysis, building upon notebook 1 and the dashboard visualisations.",
       },
       {
         type: "paragraph",
-        text: "I have also started writing the first chapter of my thesis, which focuses on the data analysis of the Belgian electricity market. This chapter will draw on the exploratory data analysis from Notebook 1 (and the corresponding visualisations now available in the data visualisation dashboard), including the price distribution, temporal patterns, volatility by hour, cross-border flows, and the impact of renewable generation. The goal is to establish the characteristics of the data that motivate the modelling choices in the subsequent chapters.",
-      },
-      { type: "heading", level: 2, text: "Next Steps" },
-      {
-        type: "list",
-        items: [
-          "Complete and analyse the results of Notebook 11 (Rolling Retrain vs. Finetune).",
-          "Continue writing the first chapter (data analysis) and integrate feedback.",
-          "Consider a unified hyperparameter optimisation across head types to resolve the quantile vs. Johnson SU comparison more rigorously.",
-        ],
+        text: "This period was a bit shorter than normal, and combined with organising the VTK jobfair I haven't been able to do a lot of work. After implementing the new notebooks I also didn't quite know what to do next and don't have a lot of clear next steps. I still need to investigate the performance difference further, which is where I'm stuck now, but other than that I'm not sure what to focus on—so I'd appreciate any input.",
       },
     ],
   }
