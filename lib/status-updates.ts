@@ -7,7 +7,7 @@ export interface StatusUpdate {
 }
 
 export interface StatusUpdateSection {
-  type: "heading" | "paragraph" | "list" | "orderedList" | "figure" | "references" | "table" | "description";
+  type: "heading" | "paragraph" | "list" | "orderedList" | "figure" | "references" | "table" | "description" | "dynamicTable";
   level?: 1 | 2 | 3 | 4;
   text?: string;
   items?: string[] | { term: string; description: string }[];
@@ -15,6 +15,8 @@ export interface StatusUpdateSection {
   caption?: string;
   references?: { key: string; text: string }[];
   table?: { headers: string[]; rows: (string | number)[][]; caption?: string };
+  /** For dynamicTable: API URL to fetch table data (headers, rows, caption). */
+  source?: string;
 }
 
 export const STATUS_UPDATES: StatusUpdate[] = [
@@ -988,17 +990,8 @@ export const STATUS_UPDATES: StatusUpdate[] = [
         text: "We tried training with different loss functions, CRPS and Pinball instead of NLL, to see if directly optimizing evaluation metrics would help. Quantile (Pinball) and Johnson SU (NLL) end up performing about the same; Gaussian CRPS does a bit worse. For ensembles, we averaged the quantile forecasts from the top models in notebook 8, and that actually works really well, best MAE (18.56) and solid PICP (0.958).",
       },
       {
-        type: "table",
-        table: {
-          caption: "Loss functions and ensemble comparison (Notebook 10).",
-          headers: ["Approach", "MAE", "PICP"],
-          rows: [
-            ["Quantile avg ensemble", 18.56, 0.958],
-            ["Quantile (Pinball)", 19.91, 0.902],
-            ["Johnson SU (NLL)", 19.98, 0.905],
-            ["Gaussian CRPS", 20.72, 0.834],
-          ],
-        },
+        type: "dynamicTable",
+        source: "/api/directions-210-summary",
       },
       { type: "heading", level: 2, text: "Notebook 12: Lévy Processes" },
       {

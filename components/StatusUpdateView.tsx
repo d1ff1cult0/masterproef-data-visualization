@@ -1,12 +1,81 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { StatusUpdateSection } from "@/lib/status-updates";
 import { STATUS_UPDATES } from "@/lib/status-updates";
 
 interface StatusUpdateViewProps {
   selectedUpdateId: string | null;
   onSelectUpdate: (id: string | null) => void;
+}
+
+function DynamicTableSection({ source }: { source: string }) {
+  const [data, setData] = useState<{ headers: string[]; rows: (string | number)[][]; caption?: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+    fetch(source)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((json) => {
+        if (json.error) throw new Error(json.error);
+        setData({ headers: json.headers ?? [], rows: json.rows ?? [], caption: json.caption });
+      })
+      .catch((err) => setError(err.message ?? "Failed to load"))
+      .finally(() => setLoading(false));
+  }, [source]);
+
+  if (loading) {
+    return (
+      <div className="my-6 py-8 text-center text-sm text-zinc-500">
+        Loading table…
+      </div>
+    );
+  }
+  if (error || !data) {
+    return (
+      <div className="my-6 py-8 text-center text-sm text-amber-600">
+        {error ?? "Could not load table. Run notebook 10 to generate comparison_summary.csv."}
+      </div>
+    );
+  }
+  const { headers, rows, caption } = data;
+  return (
+    <div className="my-6 overflow-x-auto">
+      <table className="w-full text-sm border-collapse border border-zinc-200 rounded-lg overflow-hidden">
+        {caption && (
+          <caption className="text-left text-zinc-500 italic py-2 px-3 bg-zinc-50">
+            {caption}
+          </caption>
+        )}
+        <thead>
+          <tr className="bg-zinc-100">
+            {headers.map((h, i) => (
+              <th key={i} className="border border-zinc-200 px-3 py-2 text-left font-semibold text-zinc-800">
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => (
+            <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-zinc-50/50"}>
+              {row.map((cell, j) => (
+                <td key={j} className="border border-zinc-200 px-3 py-2 text-zinc-700">
+                  {typeof cell === "number" ? cell.toLocaleString(undefined, { maximumFractionDigits: 2 }) : cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 function StatusUpdateImage({ src, alt }: { src: string; alt: string }) {
@@ -120,6 +189,12 @@ function SectionRenderer({ section }: { section: StatusUpdateSection }) {
           </table>
         </div>
       );
+    }
+
+    case "dynamicTable": {
+      const source = section.source;
+      if (!source) return null;
+      return <DynamicTableSection source={source} />;
     }
 
     case "figure":
