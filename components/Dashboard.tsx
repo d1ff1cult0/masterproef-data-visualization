@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import Sidebar from "./Sidebar";
 import MetricsView from "./MetricsView";
 import PredictionsChart from "./PredictionsChart";
@@ -50,12 +51,52 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   },
 ];
 
+function getTabAndStatusFromPath(pathname: string | null): { tab: Tab; statusId: string | null } {
+  if (!pathname) return { tab: "metrics", statusId: null };
+  if (pathname.startsWith("/status-updates/")) {
+    const id = pathname.replace("/status-updates/", "").split("/")[0];
+    return { tab: "status-updates", statusId: id || null };
+  }
+  if (pathname === "/status-updates") {
+    return { tab: "status-updates", statusId: null };
+  }
+  return { tab: "metrics", statusId: null };
+}
+
 export default function Dashboard() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const { tab: initialTab, statusId: initialStatusId } = getTabAndStatusFromPath(pathname);
   const [selectedModels, setSelectedModels] = useState<SelectedModel[]>([]);
-  const [activeTab, setActiveTab] = useState<Tab>("metrics");
-  const [selectedStatusUpdateId, setSelectedStatusUpdateId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab);
+  const [selectedStatusUpdateId, setSelectedStatusUpdateId] = useState<string | null>(initialStatusId);
 
   const hasModels = selectedModels.length > 0;
+
+  // Sync state from URL when pathname changes (e.g. browser back/forward)
+  useEffect(() => {
+    const { tab, statusId } = getTabAndStatusFromPath(pathname);
+    setActiveTab(tab);
+    setSelectedStatusUpdateId(statusId);
+  }, [pathname]);
+
+  const handleTabChange = (tab: Tab) => {
+    setActiveTab(tab);
+    if (tab === "status-updates") {
+      router.push("/status-updates");
+    } else if (pathname?.startsWith("/status-updates")) {
+      router.push("/");
+    }
+  };
+
+  const handleStatusUpdateSelect = (id: string | null) => {
+    setSelectedStatusUpdateId(id);
+    if (id) {
+      router.push(`/status-updates/${id}`);
+    } else {
+      router.push("/status-updates");
+    }
+  };
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
@@ -86,7 +127,7 @@ export default function Dashboard() {
           {TABS.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleTabChange(tab.id)}
               className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === tab.id
                   ? "border-blue-600 text-blue-600"
@@ -108,7 +149,7 @@ export default function Dashboard() {
         ) : activeTab === "status-updates" ? (
           <StatusUpdateView
             selectedUpdateId={selectedStatusUpdateId}
-            onSelectUpdate={setSelectedStatusUpdateId}
+            onSelectUpdate={handleStatusUpdateSelect}
           />
         ) : (
           <>
@@ -122,6 +163,7 @@ export default function Dashboard() {
                   onCompareInDashboard={(models) => {
                     setSelectedModels(models);
                     setActiveTab("metrics");
+                    if (pathname?.startsWith("/status-updates")) router.push("/");
                   }}
                 />
               ) : activeTab === "metrics" ? (

@@ -97,7 +97,7 @@ export default function BestModelsLanding({ onCompareInDashboard }: BestModelsLa
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/best-models?n=5&metric=${encodeURIComponent(selectedMetric)}`)
+    fetch(`/api/best-models?n=10&metric=${encodeURIComponent(selectedMetric)}`)
       .then((r) => r.json())
       .then((data) => {
         setModels(data.models ?? []);
@@ -110,13 +110,17 @@ export default function BestModelsLanding({ onCompareInDashboard }: BestModelsLa
       .finally(() => setLoading(false));
   }, [selectedMetric]);
 
+  const top10Models = models.slice(0, 10);
+  const top5Models = models.slice(0, 5);
   const modelColors = useMemo(() => {
     return models.map((_, i) => MODEL_COLORS[i % MODEL_COLORS.length]);
   }, [models]);
 
+  const TOP10_TABLE_METRICS = ["MAE", "RMSE", "MAD", "CRPS", "MPIW", "PICP", "IntervalScore"];
+
   const handleCompareInDashboard = () => {
-    if (!onCompareInDashboard || models.length === 0) return;
-    const selected: SelectedModel[] = models.map((m, i) => ({
+    if (!onCompareInDashboard || top5Models.length === 0) return;
+    const selected: SelectedModel[] = top5Models.map((m, i) => ({
       experiment: m.experiment,
       model: m.model,
       run: "average",
@@ -157,7 +161,7 @@ export default function BestModelsLanding({ onCompareInDashboard }: BestModelsLa
 
   const barDataByMetric = KEY_METRICS.map((metric) => {
     const meta = METRIC_LABELS[metric];
-    const values = models.map((m) => getValue(m, metric));
+    const values = top5Models.map((m) => getValue(m, metric));
     const validValues = values.filter((v): v is number => v != null);
     const best = meta?.lowerBetter
       ? Math.min(...validValues)
@@ -166,7 +170,7 @@ export default function BestModelsLanding({ onCompareInDashboard }: BestModelsLa
     return {
       metric,
       label: meta?.label ?? metric,
-      data: models.map((m, i) => ({
+      data: top5Models.map((m, i) => ({
         name: m.modelDisplayName.replace(/_/g, " "),
         shortName: m.modelDisplayName.length > 20
           ? m.modelDisplayName.substring(0, 18) + "…"
@@ -182,6 +186,64 @@ export default function BestModelsLanding({ onCompareInDashboard }: BestModelsLa
   return (
     <div className="p-6 space-y-8 max-w-full">
       <MethodologySection />
+
+      {/* Top 10 models comparison table */}
+      {top10Models.length > 0 && (
+        <div className="border-t border-zinc-200 pt-8">
+          <h2 className="text-xl font-semibold text-zinc-900 mb-4">
+            Top 10 Models — Key Metrics
+          </h2>
+          <div className="border border-zinc-200 rounded-lg overflow-hidden bg-white">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-zinc-50 border-b border-zinc-200">
+                    <th className="text-left py-2.5 px-4 font-medium text-zinc-600 text-xs w-8">#</th>
+                    <th className="text-left py-2.5 px-4 font-medium text-zinc-600 text-xs min-w-[140px]">Model</th>
+                    {TOP10_TABLE_METRICS.map((m) => (
+                      <th key={m} className="text-right py-2.5 px-4 text-xs font-medium text-zinc-600">
+                        {METRIC_LABELS[m]?.label ?? m}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {top10Models.map((m, i) => {
+                    const notebook = EXPERIMENT_NOTEBOOK_MAP[m.experiment];
+                    return (
+                      <tr key={`${m.experiment}/${m.model}`} className="border-b border-zinc-100">
+                        <td className="py-2 px-4 font-medium text-zinc-500 text-xs">{m.rank}</td>
+                        <td className="py-2 px-4 font-medium text-zinc-700 text-xs">
+                          <span className="truncate block max-w-[180px]" title={m.modelDisplayName}>
+                            {m.modelDisplayName.replace(/_/g, " ")}
+                          </span>
+                          {notebook != null && (
+                            <span className="text-zinc-400 text-xs font-normal block">
+                              Notebook {notebook}
+                            </span>
+                          )}
+                        </td>
+                        {TOP10_TABLE_METRICS.map((metric) => {
+                          const val = getValue(m, metric);
+                          const std = getStd(m, metric);
+                          return (
+                            <td key={metric} className="py-2 px-4 text-right text-xs tabular-nums text-zinc-600">
+                              {formatValue(val, metric)}
+                              {std != null && std > 0 && (
+                                <span className="text-zinc-400 ml-1">± {formatValue(std, metric)}</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="border-t border-zinc-200 pt-8 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -222,7 +284,7 @@ export default function BestModelsLanding({ onCompareInDashboard }: BestModelsLa
 
       {/* Rank cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        {models.map((m, i) => {
+        {top5Models.map((m, i) => {
           const notebook = EXPERIMENT_NOTEBOOK_MAP[m.experiment];
           return (
             <div
@@ -333,7 +395,7 @@ export default function BestModelsLanding({ onCompareInDashboard }: BestModelsLa
                 <th className="text-left py-2.5 px-4 font-medium text-zinc-600 text-xs w-40">
                   Metric
                 </th>
-                {models.map((m, i) => (
+                {top5Models.map((m, i) => (
                   <th key={i} className="text-right py-2.5 px-4 text-xs font-medium">
                     <div className="flex items-center justify-end gap-1.5">
                       <span
@@ -351,7 +413,7 @@ export default function BestModelsLanding({ onCompareInDashboard }: BestModelsLa
             <tbody>
               {ALL_DISPLAY_METRICS.map((metric, idx) => {
                 const meta = METRIC_LABELS[metric];
-                const values = models.map((m) => getValue(m, metric));
+                const values = top5Models.map((m) => getValue(m, metric));
                 const validValues = values.filter((v): v is number => v != null);
                 const best =
                   meta?.lowerBetter
@@ -373,7 +435,7 @@ export default function BestModelsLanding({ onCompareInDashboard }: BestModelsLa
                         </span>
                       )}
                     </td>
-                    {models.map((m, mIdx) => {
+                    {top5Models.map((m, mIdx) => {
                       const val = values[mIdx];
                       const std = getStd(m, metric);
                       const isBest = val != null && val === best && validValues.length > 0;
@@ -403,13 +465,13 @@ export default function BestModelsLanding({ onCompareInDashboard }: BestModelsLa
       </div>
 
       {/* Per-run breakdown for models with multiple runs */}
-      {models.some((m) => m.runs.length > 1) && (
+      {top5Models.some((m) => m.runs.length > 1) && (
         <div className="border border-zinc-200 rounded-lg p-4 bg-white">
           <h3 className="text-sm font-medium text-zinc-700 mb-3">
             Per-Run Breakdown
           </h3>
           <div className="space-y-4">
-            {models
+            {top5Models
               .filter((m) => m.runs.length > 1)
               .map((m, i) => (
                 <div key={`${m.experiment}/${m.model}`}>
