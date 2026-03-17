@@ -116,7 +116,7 @@ export default function BestModelsLanding({ onCompareInDashboard }: BestModelsLa
     return models.map((_, i) => MODEL_COLORS[i % MODEL_COLORS.length]);
   }, [models]);
 
-  const TOP10_TABLE_METRICS = ["MAE", "RMSE", "MAD", "CRPS", "MPIW", "PICP", "IntervalScore"];
+  const TOP10_TABLE_METRICS = ["MAE", "RMSE", "CRPS", "MPIW", "PICP", "IntervalScore"];
 
   const handleCompareInDashboard = () => {
     if (!onCompareInDashboard || top5Models.length === 0) return;
