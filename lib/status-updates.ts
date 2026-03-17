@@ -129,7 +129,7 @@ export const STATUS_UPDATES: StatusUpdate[] = [
   {
     id: "02",
     number: 2,
-    title: "21/10–04/11",
+    title: "21/10-04/11",
     date: "Literature review and experimental work",
     content: [
       { type: "heading", level: 2, text: "Literature Review" },
@@ -140,9 +140,9 @@ export const STATUS_UPDATES: StatusUpdate[] = [
       {
         type: "list",
         items: [
-          "Wen et al. – Comprehensive survey on the use of Transformers in time series forecasting",
-          "Vaswani et al. – Original \"Attention Is All You Need\" paper that introduced the Transformer architecture",
-          "Cantillo-Luna et al. – Probabilistic Transformer architecture for intra-day electricity price forecasting",
+          "Wen et al. - Comprehensive survey on the use of Transformers in time series forecasting",
+          "Vaswani et al. - Original \"Attention Is All You Need\" paper that introduced the Transformer architecture",
+          "Cantillo-Luna et al. - Probabilistic Transformer architecture for intra-day electricity price forecasting",
         ],
       },
       {
@@ -153,7 +153,7 @@ export const STATUS_UPDATES: StatusUpdate[] = [
       { type: "heading", level: 3, text: "Price Distribution Analysis" },
       {
         type: "paragraph",
-        text: "Following the last meeting, I began by analyzing the price distribution of the new dataset (2019–2025). I evaluated several candidate distributions (Normal, Log-Normal, Student's t, Johnson S_U, Skew Normal, Gamma, Weibull minimum) to model the price distribution. Based on both visual inspection and the Akaike Information Criterion (AIC), the Johnson S_U distribution provided the best fit. The Johnson S_U distribution is a transformation of the Normal distribution, where a variable X is defined from a standard normal variable Z ~ N(0,1) by the relationship X = ε + λ · sinh((Z−γ)/δ).",
+        text: "Following the last meeting, I began by analyzing the price distribution of the new dataset (2019-2025). I evaluated several candidate distributions (Normal, Log-Normal, Student's t, Johnson S_U, Skew Normal, Gamma, Weibull minimum) to model the price distribution. Based on both visual inspection and the Akaike Information Criterion (AIC), the Johnson S_U distribution provided the best fit. The Johnson S_U distribution is a transformation of the Normal distribution, where a variable X is defined from a standard normal variable Z ~ N(0,1) by the relationship X = ε + λ · sinh((Z−γ)/δ).",
       },
       {
         type: "figure",
@@ -163,7 +163,7 @@ export const STATUS_UPDATES: StatusUpdate[] = [
       { type: "heading", level: 3, text: "Probabilistic Transformer Implementation and Initial Results" },
       {
         type: "paragraph",
-        text: "I proceeded to implement a probabilistic transformer model that outputs the four parameters (γ, λ, δ, and ε) of the Johnson S_U distribution. Initial testing on the new dataset yielded disappointing results, with MAE values in the range of 10–20, compared to the previous dataset where MAE values were often below 10. I then compared both non-probabilistic and probabilistic models on both datasets. This comparison clearly demonstrates degraded performance on the new dataset, which led me to further investigate the underlying causes.",
+        text: "I proceeded to implement a probabilistic transformer model that outputs the four parameters (γ, λ, δ, and ε) of the Johnson S_U distribution. Initial testing on the new dataset yielded disappointing results, with MAE values in the range of 10-20, compared to the previous dataset where MAE values were often below 10. I then compared both non-probabilistic and probabilistic models on both datasets. This comparison clearly demonstrates degraded performance on the new dataset, which led me to further investigate the underlying causes.",
       },
       {
         type: "figure",
@@ -182,7 +182,7 @@ export const STATUS_UPDATES: StatusUpdate[] = [
       },
       {
         type: "paragraph",
-        text: "I suspected that including this volatile period in the training data would adversely affect model performance, as it exhibits different characteristics compared to the periods both before and after. To test this hypothesis, I trained the Probabilistic Transformer (PT) exclusively on data from the post-volatile period (2023–2024). This approach resulted in a 5–10% performance improvement compared to training on the full dataset (2019–2024). While this improvement is not insignificant, it was smaller than anticipated given the apparent volatility of the period. These slightly disappointing results may be attributed to the substantially reduced amount of training data available when excluding the volatile period, which limits the model's ability to learn robust patterns.",
+        text: "I suspected that including this volatile period in the training data would adversely affect model performance, as it exhibits different characteristics compared to the periods both before and after. To test this hypothesis, I trained the Probabilistic Transformer (PT) exclusively on data from the post-volatile period (2023-2024). This approach resulted in a 5-10% performance improvement compared to training on the full dataset (2019-2024). While this improvement is not insignificant, it was smaller than anticipated given the apparent volatility of the period. These slightly disappointing results may be attributed to the substantially reduced amount of training data available when excluding the volatile period, which limits the model's ability to learn robust patterns.",
       },
       {
         type: "table",
@@ -202,7 +202,7 @@ export const STATUS_UPDATES: StatusUpdate[] = [
       { type: "heading", level: 3, text: "Market Evolution Analysis" },
       {
         type: "paragraph",
-        text: "I conducted a more in-depth analysis comparing how the market has evolved relative to the dataset used in previous work (2011–2016), as this could provide insights for developing better models. Prices have become substantially more volatile in recent years. The distribution has also changed markedly, exhibiting longer and taller tails, a narrower center, and an increased frequency of negative prices. The data shows that the mean price has increased from 44.10 to 104.34 EUR/MWh, representing a 136.57% increase. The standard deviation has increased even more dramatically, from 22.66 EUR/MWh in the old dataset to 97.65 EUR/MWh in the new dataset, an increase of 330.87%. This increase in volatility is likely partially attributable to the growing share of renewable energy, which has risen from 7.87% in 2011–2016 to 17.16% in 2020–2025, an increase of 118.02%. Notably, the price-renewable correlation has also strengthened, changing from -0.089 to -0.283, indicating a more pronounced inverse relationship between renewable generation and prices. This all indicates that we will need a more robust model that can deal with this more volatile behaviour, as well as the changing market dynamics in the recent dataset.",
+        text: "I conducted a more in-depth analysis comparing how the market has evolved relative to the dataset used in previous work (2011-2016), as this could provide insights for developing better models. Prices have become substantially more volatile in recent years. The distribution has also changed markedly, exhibiting longer and taller tails, a narrower center, and an increased frequency of negative prices. The data shows that the mean price has increased from 44.10 to 104.34 EUR/MWh, representing a 136.57% increase. The standard deviation has increased even more dramatically, from 22.66 EUR/MWh in the old dataset to 97.65 EUR/MWh in the new dataset, an increase of 330.87%. This increase in volatility is likely partially attributable to the growing share of renewable energy, which has risen from 7.87% in 2011-2016 to 17.16% in 2020-2025, an increase of 118.02%. Notably, the price-renewable correlation has also strengthened, changing from -0.089 to -0.283, indicating a more pronounced inverse relationship between renewable generation and prices. This all indicates that we will need a more robust model that can deal with this more volatile behaviour, as well as the changing market dynamics in the recent dataset.",
       },
       {
         type: "figure",
@@ -250,9 +250,9 @@ export const STATUS_UPDATES: StatusUpdate[] = [
       {
         type: "references",
         references: [
-          { key: "wen2023survey", text: "Wen et al. – Transformers in time series forecasting survey" },
-          { key: "vaswani2023attention", text: "Vaswani et al. – Attention Is All You Need" },
-          { key: "cantillo2023", text: "Cantillo-Luna et al. – Probabilistic Transformer for intra-day electricity price forecasting" },
+          { key: "wen2023survey", text: "Wen et al. - Transformers in time series forecasting survey" },
+          { key: "vaswani2023attention", text: "Vaswani et al. - Attention Is All You Need" },
+          { key: "cantillo2023", text: "Cantillo-Luna et al. - Probabilistic Transformer for intra-day electricity price forecasting" },
         ],
       },
     ],
@@ -260,7 +260,7 @@ export const STATUS_UPDATES: StatusUpdate[] = [
   {
     id: "03",
     number: 3,
-    title: "05/11–24/11",
+    title: "05/11-24/11",
     date: "Lag configuration, output head, and preprocessing optimization",
     content: [
       {
@@ -287,7 +287,7 @@ export const STATUS_UPDATES: StatusUpdate[] = [
           { term: "recent_336h", description: "Last 336 hours (2 weeks) of data" },
           { term: "hybrid_recent_and_daily", description: "Last 24 hours plus weekly samples from the past month" },
           { term: "recent_24h", description: "Last 24 hours only" },
-          { term: "recent_168h", description: "Last 168 hours (1 week) – the baseline we used before" },
+          { term: "recent_168h", description: "Last 168 hours (1 week)  the baseline we used before" },
           { term: "short_term_3h", description: "Last 3 hours only" },
           { term: "daily_same_hour_200d", description: "Same hour from the past 200 days" },
           { term: "daily_same_hour_90d", description: "Same hour from the past 90 days" },
@@ -298,7 +298,7 @@ export const STATUS_UPDATES: StatusUpdate[] = [
       { type: "heading", level: 2, text: "Experimental Results" },
       {
         type: "paragraph",
-        text: "All models used the same hyperparameters and were trained on data from 2023–2025 (after the volatile period). Results are in the table below.",
+        text: "All models used the same hyperparameters and were trained on data from 2023-2025 (after the volatile period). Results are in the table below.",
       },
       {
         type: "table",
@@ -322,11 +322,11 @@ export const STATUS_UPDATES: StatusUpdate[] = [
       { type: "heading", level: 3, text: "Initial Findings" },
       {
         type: "paragraph",
-        text: "The recent_72h configuration performed best with MAE 10.68 and RMSE 16.59, beating the baseline 168-hour window while using fewer lags and training faster. This shows that the most recent 2–3 days contain the most important information.",
+        text: "The recent_72h configuration performed best with MAE 10.68 and RMSE 16.59, beating the baseline 168-hour window while using fewer lags and training faster. This shows that the most recent 2-3 days contain the most important information.",
       },
       {
         type: "paragraph",
-        text: "Expanding to two weeks (recent_336h) only slightly improved RMSE but doubled training time. Very short windows (24h or 3h) performed worse, showing we need at least 2–3 days of history. Seasonal-only sampling (daily or weekly patterns without recent data) performed badly, with errors getting worse as the maximum lag increased.",
+        text: "Expanding to two weeks (recent_336h) only slightly improved RMSE but doubled training time. Very short windows (24h or 3h) performed worse, showing we need at least 2-3 days of history. Seasonal-only sampling (daily or weekly patterns without recent data) performed badly, with errors getting worse as the maximum lag increased.",
       },
       {
         type: "paragraph",
@@ -359,7 +359,7 @@ export const STATUS_UPDATES: StatusUpdate[] = [
       { type: "heading", level: 3, text: "Final Optimization Sweep" },
       {
         type: "paragraph",
-        text: "I tested more combinations focusing on 36–96 hour windows with 4–12 weekly anchors to find the best balance. Results are in the table below.",
+        text: "I tested more combinations focusing on 36-96 hour windows with 4-12 weekly anchors to find the best balance. Results are in the table below.",
       },
       {
         type: "table",
@@ -391,7 +391,7 @@ export const STATUS_UPDATES: StatusUpdate[] = [
       { type: "heading", level: 3, text: "Conclusion and Recommendation" },
       {
         type: "paragraph",
-        text: "The pattern across all experiments is clear: dense coverage of the last 2–3 days plus a few weekly anchors works best. recent_48h_plus_weekly4 has the best MAE (10.32) and RMSE (15.95), but recent_72h_plus_weekly12 is more robust with good performance (MAE 10.87, RMSE 16.05) and reasonable training time (~489s).",
+        text: "The pattern across all experiments is clear: dense coverage of the last 2-3 days plus a few weekly anchors works best. recent_48h_plus_weekly4 has the best MAE (10.32) and RMSE (15.95), but recent_72h_plus_weekly12 is more robust with good performance (MAE 10.87, RMSE 16.05) and reasonable training time (~489s).",
       },
       {
         type: "paragraph",
@@ -460,7 +460,7 @@ export const STATUS_UPDATES: StatusUpdate[] = [
       },
       {
         type: "paragraph",
-        text: "Interestingly, mixture components do help—the 3-component Gaussian and 2–3 component Johnson SU models perform better than single-component versions. For now, I'll use the Gaussian 3-component model since it has the best point forecasts and perfect calibration.",
+        text: "Interestingly, mixture components do help, the 3-component Gaussian and 2-3 component Johnson SU models perform better than single-component versions. For now, I'll use the Gaussian 3-component model since it has the best point forecasts and perfect calibration.",
       },
       { type: "heading", level: 2, text: "Preprocessing Methods Comparison" },
       {
@@ -522,7 +522,7 @@ export const STATUS_UPDATES: StatusUpdate[] = [
     id: "04",
     number: 4,
     title: "After literature study and exam period",
-    date: "25/11–19/02 — Refactoring, methodology refinement, and Ornstein-Uhlenbeck experiments",
+    date: "25/11-19/02: Refactoring, methodology refinement, and Ornstein-Uhlenbeck experiments",
     content: [
       {
         type: "paragraph",
@@ -617,7 +617,7 @@ export const STATUS_UPDATES: StatusUpdate[] = [
       {
         type: "references",
         references: [
-          { key: "zhang2025transformerou", text: "Zhang et al. – Transformer with Ornstein-Uhlenbeck process" },
+          { key: "zhang2025transformerou", text: "Zhang et al. - Transformer with Ornstein-Uhlenbeck process" },
         ],
       },
     ],
@@ -663,14 +663,14 @@ export const STATUS_UPDATES: StatusUpdate[] = [
             ["GMM-5", "20.55 ± 0.77", 27.92, 77.4, 0.920, 97.1, 147.4, 15.31, 6.81],
             ["JSU-Mix-2", "20.58 ± 1.26", 28.04, 75.2, 0.923, 100.1, 150.0, 15.12, 6.74],
             ["GMM-2", "20.72 ± 0.78", 27.93, 76.9, 0.929, 100.5, 144.0, 15.38, 6.82],
-            ["JohnsonSU", "20.72 ± 0.81", 27.98, 69.8, 0.935, 109.2, 150.0, 15.17, "—"],
+            ["JohnsonSU", "20.72 ± 0.81", 27.98, 69.8, 0.935, 109.2, 150.0, 15.17, "/"],
             ["GMM-3", "20.84 ± 1.13", 28.15, 73.2, 0.935, 104.8, 147.9, 15.61, 6.93],
             ["JSU-Mix-3", "20.85 ± 1.24", 28.31, 76.6, 0.895, 91.2, 158.2, 15.49, 6.93],
             ["Quantile-99", "21.05 ± 0.69", 28.66, 81.5, 0.907, 97.0, 157.8, 15.55, 6.99],
             ["Quantile-9", "21.18 ± 1.16", 28.69, 84.1, 0.805, 73.2, 210.3, 15.97, 7.09],
             ["Quantile-89", "21.33 ± 0.73", 28.86, 81.4, 0.895, 95.6, 169.8, 15.81, 7.13],
             ["Quantile-49", "21.57 ± 0.82", 29.04, 82.7, 0.904, 99.7, 162.8, 15.95, 7.16],
-            ["Gaussian", "21.59 ± 0.61", 28.70, 66.9, 0.942, 117.0, 154.4, 15.93, "—"],
+            ["Gaussian", "21.59 ± 0.61", 28.70, 66.9, 0.942, 117.0, 154.4, 15.93, "/"],
             ["Quantile-29", "21.61 ± 0.62", 29.18, 88.0, 0.861, 88.3, 183.8, 16.15, 7.29],
             ["Quantile-19", "21.65 ± 0.75", 29.40, 82.2, 0.857, 85.6, 188.5, 16.16, 7.25],
             ["Quantile-79", "21.67 ± 1.06", 29.36, 84.1, 0.883, 96.6, 182.4, 16.20, 7.33],
@@ -730,7 +730,7 @@ export const STATUS_UPDATES: StatusUpdate[] = [
             ["RobustScaling", 22.33, 30.35, 0.906, 112.7, 193.9, 16.65, 50.3],
             ["RollingWindowScaling", 25.54, 34.07, 0.840, 102.2, 236.8, 19.37, 47.2],
             ["MADScaling", 34.40, 45.81, 0.950, 187.0, 240.2, 26.56, 49.5],
-            ["BoxCox", 40.03, 52.52, 0.992, 251.2, 257.8, "—", 40.8],
+            ["BoxCox", 40.03, 52.52, 0.992, 251.2, 257.8, "/", 40.8],
           ],
         },
       },
@@ -787,7 +787,7 @@ export const STATUS_UPDATES: StatusUpdate[] = [
       },
       {
         type: "paragraph",
-        text: "GBDTs (LightGBM, XGBoost) win on MAE and CRPS while deep learning models hover around 21–22 MAE. The Transformer is optimized with Optuna, and here the quantile head outperforms the Johnson SU head on MAE (20.96 vs. 21.75), unlike in Notebook 4, where quantile heads ranked below mixture heads. This may be due to Optuna finding better hyperparameters for the quantile head in this benchmark setup, whereas the hyperparameters used in Notebook 4 were optimized for the standard Gaussian output head.",
+        text: "GBDTs (LightGBM, XGBoost) win on MAE and CRPS while deep learning models hover around 21-22 MAE. The Transformer is optimized with Optuna, and here the quantile head outperforms the Johnson SU head on MAE (20.96 vs. 21.75), unlike in Notebook 4, where quantile heads ranked below mixture heads. This may be due to Optuna finding better hyperparameters for the quantile head in this benchmark setup, whereas the hyperparameters used in Notebook 4 were optimized for the standard Gaussian output head.",
       },
       { type: "heading", level: 3, text: "Notebook 7: Hybrid Transformer vs. Standard Transformer Comparison" },
       {
@@ -926,12 +926,24 @@ export const STATUS_UPDATES: StatusUpdate[] = [
     content: [
       {
         type: "paragraph",
-        text: "I struggled in the first semester with visualizing and comparing the results of all my models—metrics don't tell you everything, they don't tell you when the model performs well or badly, just how it performs overall. I thought about making a dashboard back then but deemed it a bit out of scope for the thesis. When I saw Clément's dashboard though, I was sold on the idea, so I made this one (obviously with the help of AI) and I've found it really valuable already for visualizing and interpreting my data. I'm also not a big fan of LaTeX, so I found it a better and more organized solution to put the status updates here as well.",
+        text: "I struggled in the first semester with visualizing and comparing the results of all my models" +
+            ", since metrics don't tell you everything, " +
+            "they don't tell you when the model performs well or badly, " +
+            "just how it performs overall. I thought about making a dashboard back " +
+            "then but it seemed it a bit out of scope for the thesis. When I saw Clément's dashboard though," +
+            " I was sold on the idea, so I made this one (obviously with the help of AI) " +
+            "and I've found it really valuable already for visualizing and interpreting my data." +
+            " I'm also not a big fan of LaTeX, so I found it a better and more organized solution to put the status updates here as well.",
       },
       { type: "heading", level: 2, text: "MAE Difference Investigation" },
       {
         type: "paragraph",
-        text: "I reran the old code with the same train/val/test set and the same hyperparameters. As expected, the resulting MAE is worse than the 11–14 seen in the first semester, but it is still better than all of the basic transformers I have trained with the refactored code. I first thought this might be due to the expanding window retraining done in the pre-refactored code, so I implemented notebook 11 to test this. There still seems to be a slight advantage for the old model though, so I will need to investigate further to really understand where the difference comes from.",
+        text: "I reran the old code with the same train/val/test set and the same hyperparameters." +
+            " As expected, the resulting MAE (around 18.75) is worse than the 11-14 seen in the first semester," +
+            " but it is still better than all of the basic transformers I have trained with the refactored code (all of which have a MAE of just above 20). " +
+            "I first thought this might be due to the expanding window retraining done in the pre-refactored code," +
+            " so I implemented notebook 11 to test this. There still seems to be a slight advantage for the old model though," +
+            " so I will need to investigate further to really understand where the difference comes from.",
       },
       {
         type: "table",
@@ -952,7 +964,10 @@ export const STATUS_UPDATES: StatusUpdate[] = [
       { type: "heading", level: 2, text: "Notebook 9: Mixture-of-Experts" },
       {
         type: "paragraph",
-        text: "Notebook 9 compares the standard Transformer (Johnson SU) against a Mixture-of-Experts setup and a shared-backbone mixture head. The Mixture JSU (3 components) model does best on MAE, RMSE and CRPS. The MoE architecture with separate experts doesn't beat the simpler shared-backbone mixture, so the extra complexity doesn't seem to pay off for this dataset.",
+        text: "Notebook 9 compares the standard Transformer (Johnson SU) against a " +
+            "Mixture-of-Experts setup and a JSU mixture head. The Mixture JSU (3 components) model does best on MAE," +
+            " RMSE and CRPS. The MoE architecture with separate experts doesn't beat the simpler mixture model," +
+            " so the extra complexity doesn't seem to pay off for this dataset.",
       },
       {
         type: "table",
@@ -967,30 +982,28 @@ export const STATUS_UPDATES: StatusUpdate[] = [
           ],
         },
       },
-      { type: "heading", level: 2, text: "Notebook 10: CRPS, Conformal, Ensemble" },
+      { type: "heading", level: 2, text: "Notebook 10: Loss Functions & Ensembles" },
       {
         type: "paragraph",
-        text: "Notebook 10 looks at CRPS/Pinball loss, conformal prediction, and ensembles. Quantile averaging of the top models from notebook 8 gives the best MAE (18.56) and PICP (0.958). Quantile and Johnson SU perform similarly on MAE; Johnson SU has slightly better PICP. Conformal prediction hits the target coverage but with wider intervals and higher MAE.",
+        text: "We tried training with different loss functions, CRPS and Pinball instead of NLL, to see if directly optimizing evaluation metrics would help. Quantile (Pinball) and Johnson SU (NLL) end up performing about the same; Gaussian CRPS does a bit worse. For ensembles, we averaged the quantile forecasts from the top models in notebook 8, and that actually works really well, best MAE (18.56) and solid PICP (0.958).",
       },
       {
         type: "table",
         table: {
-          caption: "CRPS/Conformal/Ensemble comparison (Notebook 10).",
+          caption: "Loss functions and ensemble comparison (Notebook 10).",
           headers: ["Approach", "MAE", "PICP"],
           rows: [
             ["Quantile avg ensemble", 18.56, 0.958],
             ["Quantile (Pinball)", 19.91, 0.902],
             ["Johnson SU (NLL)", 19.98, 0.905],
             ["Gaussian CRPS", 20.72, 0.834],
-            ["Conformal (Johnson SU)", 22.04, 0.953],
-            ["Stacking (2 models)", 22.20, "—"],
           ],
         },
       },
       { type: "heading", level: 2, text: "Notebook 12: Lévy Processes" },
       {
         type: "paragraph",
-        text: "Notebook 12 experiments with Lévy jump-diffusion processes in the Hybrid Transformer + SDE setup. It adds compound Poisson jumps on top of the OU diffusion: Gaussian jumps (symmetric, light tails), Laplace jumps (heavier tails), and asymmetric jumps (larger upward spikes than downward).",
+        text: "Notebook 12 experiments with Lévy jump-diffusion processes in the Hybrid Transformer + SDE setup. It adds compound Poisson jumps on top of the OU diffusion: Gaussian jumps (symmetric, light tails), Laplace jumps (heavier tails), and asymmetric jumps. The asymmetric one is interesting since it uses two separate Poisson processes, one for upward spikes and one for downward moves, each with exponential jump sizes. So upward jumps can be larger on average than downward ones, which fits the idea that electricity prices spike up more than they drop. In practice though it ends up over-predicting uncertainty, very high PICP (99.6%) but way wider intervals and worse MAE/CRPS. The simpler Gaussian jump model does best, a small improvement over the baseline OU-only model. Laplace jumps don't add much.",
       },
       {
         type: "table",
@@ -1005,23 +1018,35 @@ export const STATUS_UPDATES: StatusUpdate[] = [
           ],
         },
       },
-      {
-        type: "paragraph",
-        text: "The Gaussian jump model does best on MAE and CRPS—a small improvement over the baseline OU-only model. Laplace jumps don't add much. The asymmetric jump model has very high PICP (99.6%) but much wider intervals and worse MAE/CRPS, so it over-predicts uncertainty and doesn't help.",
-      },
       { type: "heading", level: 2, text: "Quantile vs. Johnson SU (Notebook 6 vs. 4)" },
       {
         type: "paragraph",
-        text: "Notebook 6 finds the quantile head slightly better than Johnson SU; notebook 4 finds the opposite. The difference comes from the optimisation: notebook 4 uses fixed hyperparameters for all heads, while notebook 6 optimises each model separately with Optuna. So the quantile head benefits from head-specific tuning; with shared hyperparameters, Johnson SU does better because it fits the price distribution more naturally.",
+        text: "Notebook 6 finds the quantile head slightly better than Johnson SU while notebook 4 finds the opposite." +
+            " The difference comes from the optimisation: notebook 4 uses fixed hyperparameters for all heads," +
+            " while notebook 6 optimises each model separately with Optuna." +
+            " So the quantile head benefits from head-specific tuning, while with shared hyperparameters Johnson SU does better " +
+            "because it fits the price distribution more naturally.",
       },
       { type: "heading", level: 2, text: "Literature and Writing" },
       {
         type: "paragraph",
-        text: "I've incorporated feedback from Stefano and Chris into the literature study. I've also started writing the first chapter on the Belgian electricity market data analysis, building upon notebook 1 and the dashboard visualisations.",
+        text: "I've further incorporated feedback from Stefano and Chris into the literature study." +
+            " I've also started writing the first chapter on the Belgian electricity market data analysis," +
+            " building upon notebook 1 and the dashboard visualisations.",
       },
+      { type: "heading", level: 2, text: "What next?" },
       {
         type: "paragraph",
-        text: "This period was a bit shorter than normal, and combined with organising the VTK jobfair I haven't been able to do a lot of work. After implementing the new notebooks I also didn't quite know what to do next and don't have a lot of clear next steps. I still need to investigate the performance difference further, which is where I'm stuck now, but other than that I'm not sure what to focus on—so I'd appreciate any input.",
+        text: "This period was a bit shorter than normal, and combined with organising the VTK jobfair" +
+            " I haven't been able to do a lot of work. After implementing the new notebooks I also didn't" +
+            " quite know what to do next and don't have a lot of clear next steps. " +
+            "I still need to investigate the performance difference further, which is where I'm stuck now," +
+            " but other than that I'm not sure what to focus on, so I'd appreciate any input. " +
+            "It just seems like the transformer on which i have been focussed from the beginning is decent from the start, " +
+            "but it is hard to squeeze extra performance out of it, and it seems to be outperformed by the other models i tried. " +
+            "Even with all the enhancements i tried its always close to baseline. " +
+            "Even if i find something which causes the performance to be worse than before refactoring, the results would still only be marginally better than LSTM or DeepAR, and still worse than Gradient Boosting." +
+            "This leaves me a bit worried for my thesis, and I am unsure what to do next. ",
       },
     ],
   }

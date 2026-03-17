@@ -85,6 +85,7 @@ export const METRIC_LABELS: Record<string, { label: string; lowerBetter: boolean
   PINAW: { label: "PINAW", lowerBetter: true, format: ".4f" },
   IntervalScore: { label: "Interval Score", lowerBetter: true, format: ".2f" },
   CRPS: { label: "CRPS", lowerBetter: true, format: ".2f" },
+  MAD: { label: "MAD", lowerBetter: true, format: ".2f" },
   NLL: { label: "NLL", lowerBetter: true, format: ".2f" },
   Pinball_10: { label: "Pinball 10%", lowerBetter: true, format: ".2f" },
   Pinball_50: { label: "Pinball 50%", lowerBetter: true, format: ".2f" },
