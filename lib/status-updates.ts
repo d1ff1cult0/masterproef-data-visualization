@@ -942,7 +942,8 @@ export const STATUS_UPDATES: StatusUpdate[] = [
             " As expected, the resulting MAE (around 18.75) is worse than the 11-14 seen in the first semester," +
             " but it is still better than all of the basic transformers I have trained with the refactored code (all of which have a MAE of just above 20). " +
             "I first thought this might be due to the expanding window retraining done in the pre-refactored code," +
-            " so I implemented notebook 11 to test this. There still seems to be a slight advantage for the old model though," +
+            " so I implemented notebook 11 to test this. This also did not give satisfactory results, with MAEs still above 20. " +
+            "There thus still seems to be a slight advantage for the old model," +
             " so I will need to investigate further to really understand where the difference comes from.",
       },
       {
