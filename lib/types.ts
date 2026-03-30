@@ -114,5 +114,10 @@ export const EXPERIMENT_NOTEBOOK_MAP: Record<string, number> = {
   directions_210: 10,
   rolling_evaluation: 11,
   levy_processes_study: 12,
+  encoder_decoder_test: 13,
   transformer_grid_search: 2,
+  "13_improved_transformer": 13,
+  keras_pytorch_jsu_10run: 14,
+  train_val_test_window_study: 15,
+  train_val_test_window_study_lear: 16,
 };

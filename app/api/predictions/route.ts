@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readNpzSlice, getNpzTotalDays, getNpzTotalRows, averageArrays } from "@/lib/npz-reader";
+import { readNpzDayRange, getNpzTotalDays, averageArrays } from "@/lib/npz-reader";
 import { getPredictionsPath, getRunCount, generateDateLabels } from "@/lib/results";
 import type { PredictionPoint, PredictionResponse } from "@/lib/types";
 
@@ -21,13 +21,8 @@ export async function GET(request: NextRequest) {
   try {
     const firstPath = getPredictionsPath(experiment, model, 0);
     const totalDays = getNpzTotalDays(firstPath);
-    const totalRows = getNpzTotalRows(firstPath);
 
     const end = endDay ? parseInt(endDay) : Math.min(totalDays, startDay + 30);
-
-    const STRIDE = 24;
-    const startRow = startDay * STRIDE;
-    const endRow = Math.min(end * STRIDE, totalRows);
 
     let arrays;
     if (run === "average") {
@@ -35,23 +30,24 @@ export async function GET(request: NextRequest) {
       const allRuns = [];
       for (let i = 0; i < nRuns; i++) {
         const p = getPredictionsPath(experiment, model, i);
-        allRuns.push(readNpzSlice(p, startRow, endRow, STRIDE));
+        allRuns.push(readNpzDayRange(p, startDay, end));
       }
       arrays = averageArrays(allRuns);
     } else {
       const runIdx = parseInt(run);
       const p = getPredictionsPath(experiment, model, runIdx);
-      arrays = readNpzSlice(p, startRow, endRow, STRIDE);
+      arrays = readNpzDayRange(p, startDay, end);
     }
 
     const nDays = arrays.y_test?.length ?? 0;
-    const dates = generateDateLabels(nDays, startDay);
+    const hoursPerDay = arrays.y_test?.[0]?.length ?? 24;
+    const dates = generateDateLabels(nDays, startDay, hoursPerDay);
     const keys = Object.keys(arrays).filter((k) => k !== "y_test");
 
     const data: PredictionPoint[] = [];
     for (let d = 0; d < nDays; d++) {
-      for (let h = 0; h < 24; h++) {
-        const idx = d * 24 + h;
+      for (let h = 0; h < hoursPerDay; h++) {
+        const idx = d * hoursPerDay + h;
         const point: PredictionPoint = {
           index: idx,
           hour: h,

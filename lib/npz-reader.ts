@@ -128,29 +128,121 @@ export function readNpz(filePath: string): PredictionArrays {
   return arrays;
 }
 
-export function getNpzTotalDays(filePath: string): number {
-  const totalRows = getNpzTotalRows(filePath);
-  return Math.ceil(totalRows / 24);
-}
-
-export function getNpzTotalRows(filePath: string): number {
-  if (!fs.existsSync(filePath)) return 0;
+/** y_test layout from training: (n_days, output_horizon) e.g. (N, 24), not (N*24,) hourly rows. */
+export function getNpzYTestShape(filePath: string): number[] | null {
+  if (!fs.existsSync(filePath)) return null;
   const zip = new AdmZip(filePath);
   const entry = zip.getEntries().find((e) => e.entryName === "y_test.npy");
-  if (!entry) return 0;
+  if (!entry) return null;
   const buffer = entry.getData();
   if (
     buffer[0] !== 0x93 || buffer[1] !== 0x4e || buffer[2] !== 0x55 ||
     buffer[3] !== 0x4d || buffer[4] !== 0x50 || buffer[5] !== 0x59
-  ) return 0;
+  ) return null;
   const major = buffer[6];
   const headerLen = major === 1 ? buffer.readUInt16LE(8) : buffer.readUInt32LE(8);
   const headerOffset = major === 1 ? 10 : 12;
   const headerStr = buffer.toString("latin1", headerOffset, headerOffset + headerLen);
   const shapeMatch = headerStr.match(/'shape'\s*:\s*\(([^)]*)\)/);
-  if (!shapeMatch) return 0;
-  const shape = shapeMatch[1].split(",").map((s) => s.trim()).filter((s) => s.length > 0).map(Number);
-  return shape[0] ?? 0;
+  if (!shapeMatch) return null;
+  return shapeMatch[1].split(",").map((s) => s.trim()).filter((s) => s.length > 0).map(Number);
+}
+
+export function getNpzTotalDays(filePath: string): number {
+  const shape = getNpzYTestShape(filePath);
+  if (!shape || shape.length === 0) return 0;
+  // Day-major: each row is one forecast day (multiple hours per row).
+  if (shape.length === 2 && shape[1] > 1) {
+    return shape[0];
+  }
+  // Hour-major: one row per hour (legacy / alternate layout).
+  const nHourRows = shape.length === 2 ? shape[0] : shape[0];
+  return Math.ceil(nHourRows / 24);
+}
+
+/** First dimension of y_test (days if day-major, else hour-row count). */
+export function getNpzTotalRows(filePath: string): number {
+  const shape = getNpzYTestShape(filePath);
+  return shape?.[0] ?? 0;
+}
+
+/**
+ * Load prediction arrays for [startDay, endDay) in calendar-day index (same as Python sequences).
+ * Handles y_test (N, H) day-major — the format produced by `save_run` / `create_sequences`.
+ */
+export function readNpzDayRange(
+  filePath: string,
+  startDay: number,
+  endDay: number
+): PredictionArrays {
+  const shape = getNpzYTestShape(filePath);
+  if (!shape?.length) {
+    throw new Error(`Invalid or missing y_test in ${filePath}`);
+  }
+
+  const totalDays =
+    shape.length === 2 && shape[1] > 1
+      ? shape[0]
+      : Math.ceil((shape.length === 2 ? shape[0] : shape[0]) / 24);
+
+  const start = Math.max(0, startDay);
+  const endExclusive = Math.min(Math.max(start, endDay), totalDays);
+
+  const full = readNpz(filePath);
+
+  if (shape.length === 2 && shape[1] > 1) {
+    const sliced: PredictionArrays = {};
+    for (const [key, arr] of Object.entries(full)) {
+      if (
+        Array.isArray(arr) &&
+        arr.length > 0 &&
+        Array.isArray(arr[0]) &&
+        arr[0].length > 1
+      ) {
+        sliced[key] = arr.slice(start, endExclusive);
+      } else {
+        sliced[key] = arr;
+      }
+    }
+    return sliced;
+  }
+
+  const nHoursTotal = shape.length === 2 ? shape[0] : shape[0];
+  const hStart = start * 24;
+  const hEnd = Math.min(endExclusive * 24, nHoursTotal);
+  const hourCount = Math.max(0, hEnd - hStart);
+  const nDayRows = Math.floor(hourCount / 24);
+
+  const sliced: PredictionArrays = {};
+  for (const [key, arr] of Object.entries(full)) {
+    if (
+      Array.isArray(arr) &&
+      arr.length > 1 &&
+      Array.isArray(arr[0]) &&
+      arr[0].length === 1
+    ) {
+      const hourSlice: number[] = [];
+      for (let r = hStart; r < hEnd; r++) {
+        hourSlice.push(arr[r]?.[0] ?? 0);
+      }
+      const reshaped: number[][] = [];
+      for (let d = 0; d < nDayRows; d++) {
+        reshaped.push(hourSlice.slice(d * 24, (d + 1) * 24));
+      }
+      sliced[key] = reshaped;
+    } else if (Array.isArray(arr) && arr.length === 1 && Array.isArray(arr[0])) {
+      const flat = arr[0];
+      const hourSlice = flat.slice(hStart, hEnd);
+      const reshaped: number[][] = [];
+      for (let d = 0; d < nDayRows; d++) {
+        reshaped.push(hourSlice.slice(d * 24, (d + 1) * 24));
+      }
+      sliced[key] = reshaped;
+    } else {
+      sliced[key] = arr;
+    }
+  }
+  return sliced;
 }
 
 export function readNpzSlice(

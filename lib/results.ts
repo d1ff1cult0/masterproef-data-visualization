@@ -11,13 +11,17 @@ export function getResultsDir(): string {
   return RESULTS_DIR;
 }
 
-export function generateDateLabels(nDays: number, startDay: number = 0): string[] {
+export function generateDateLabels(
+  nDays: number,
+  startDay: number = 0,
+  hoursPerDay: number = 24
+): string[] {
   const labels: string[] = [];
   for (let d = startDay; d < startDay + nDays; d++) {
     const dayDate = new Date(TEST_START_DATE);
     dayDate.setUTCDate(dayDate.getUTCDate() + d);
     const dateStr = dayDate.toISOString().split("T")[0];
-    for (let h = 0; h < 24; h++) {
+    for (let h = 0; h < hoursPerDay; h++) {
       labels.push(`${dateStr} ${String(h).padStart(2, "0")}:00`);
     }
   }
