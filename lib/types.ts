@@ -120,4 +120,5 @@ export const EXPERIMENT_NOTEBOOK_MAP: Record<string, number> = {
   keras_pytorch_jsu_10run: 14,
   train_val_test_window_study: 15,
   train_val_test_window_study_lear: 16,
+  lear_transformer_ensemble: 17,
 };
