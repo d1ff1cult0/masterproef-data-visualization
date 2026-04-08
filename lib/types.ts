@@ -121,4 +121,13 @@ export const EXPERIMENT_NOTEBOOK_MAP: Record<string, number> = {
   train_val_test_window_study: 15,
   train_val_test_window_study_lear: 16,
   lear_transformer_ensemble: 17,
+  rolling_recalibration: 19,
+  probabilistic_lear_baseline: 20,
+  lear_feature_transformer: 21,
+  patchtst: 22,
+  sequential_conformal: 23,
+  dataset_v1_vs_v2: 24,
+  transformer_optimization: 25,
+  feature_selection_v2: 26,
+  closing_the_gap: 27,
 };

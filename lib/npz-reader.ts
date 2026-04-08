@@ -98,6 +98,60 @@ function reshape2D(flat: number[], rows: number, cols: number): number[][] {
   return result;
 }
 
+function is2DArray(arr: unknown): arr is number[][] {
+  return Array.isArray(arr) && arr.length > 0 && Array.isArray(arr[0]);
+}
+
+/**
+ * Detects the common sliding-window layout:
+ * row i+1 is row i shifted left by one hour (for y_test this should be near-exact).
+ */
+function isSlidingHourlySequence(yTest: number[][]): boolean {
+  const rows = yTest.length;
+  const cols = yTest[0]?.length ?? 0;
+  if (rows < 3 || cols < 2) return false;
+
+  const maxRows = Math.min(rows - 1, 512);
+  let comparisons = 0;
+  let matches = 0;
+  const eps = 1e-9;
+
+  for (let r = 0; r < maxRows; r++) {
+    for (let c = 0; c < cols - 1; c++) {
+      const a = yTest[r]?.[c + 1];
+      const b = yTest[r + 1]?.[c];
+      if (a == null || b == null || Number.isNaN(a) || Number.isNaN(b)) continue;
+      comparisons++;
+      if (Math.abs(a - b) <= eps) matches++;
+    }
+  }
+
+  if (comparisons === 0) return false;
+  return matches / comparisons > 0.98;
+}
+
+/** Converts overlapping (n_rows, horizon) windows into a single hourly timeline. */
+function stitchSlidingWindowsToHourly(arr: number[][]): number[] {
+  const rows = arr.length;
+  const cols = arr[0]?.length ?? 0;
+  if (rows === 0 || cols === 0) return [];
+
+  const hourly = arr[0].slice();
+  for (let r = 1; r < rows; r++) {
+    hourly.push(arr[r][cols - 1] ?? 0);
+  }
+  return hourly;
+}
+
+function reshapeHourlyToDayRows(hourly: number[], hoursPerDay: number = 24): number[][] {
+  const nDays = Math.floor(hourly.length / hoursPerDay);
+  const rows: number[][] = new Array(nDays);
+  for (let d = 0; d < nDays; d++) {
+    rows[d] = hourly.slice(d * hoursPerDay, (d + 1) * hoursPerDay);
+  }
+  return rows;
+}
+
 export interface PredictionArrays {
   [key: string]: number[][];
 }
@@ -149,15 +203,23 @@ export function getNpzYTestShape(filePath: string): number[] | null {
 }
 
 export function getNpzTotalDays(filePath: string): number {
-  const shape = getNpzYTestShape(filePath);
-  if (!shape || shape.length === 0) return 0;
-  // Day-major: each row is one forecast day (multiple hours per row).
-  if (shape.length === 2 && shape[1] > 1) {
-    return shape[0];
+  const full = readNpz(filePath);
+  const yTest = full.y_test;
+  if (!is2DArray(yTest) || yTest.length === 0) return 0;
+
+  const cols = yTest[0]?.length ?? 0;
+  if (cols > 1 && isSlidingHourlySequence(yTest)) {
+    const totalHours = yTest.length + cols - 1;
+    return Math.ceil(totalHours / 24);
   }
-  // Hour-major: one row per hour (legacy / alternate layout).
-  const nHourRows = shape.length === 2 ? shape[0] : shape[0];
-  return Math.ceil(nHourRows / 24);
+
+  if (cols > 1) {
+    // Non-overlapping day-major layout.
+    return yTest.length;
+  }
+
+  // One row per hour (legacy / alternate layout).
+  return Math.ceil(yTest.length / 24);
 }
 
 /** First dimension of y_test (days if day-major, else hour-row count). */
@@ -175,22 +237,24 @@ export function readNpzDayRange(
   startDay: number,
   endDay: number
 ): PredictionArrays {
-  const shape = getNpzYTestShape(filePath);
-  if (!shape?.length) {
+  const full = readNpz(filePath);
+  const yTest = full.y_test;
+  if (!is2DArray(yTest) || yTest.length === 0) {
     throw new Error(`Invalid or missing y_test in ${filePath}`);
   }
+  const cols = yTest[0]?.length ?? 0;
+  const sliding = cols > 1 && isSlidingHourlySequence(yTest);
 
-  const totalDays =
-    shape.length === 2 && shape[1] > 1
-      ? shape[0]
-      : Math.ceil((shape.length === 2 ? shape[0] : shape[0]) / 24);
+  const totalDays = sliding
+    ? Math.ceil((yTest.length + cols - 1) / 24)
+    : cols > 1
+      ? yTest.length
+      : Math.ceil(yTest.length / 24);
 
   const start = Math.max(0, startDay);
   const endExclusive = Math.min(Math.max(start, endDay), totalDays);
 
-  const full = readNpz(filePath);
-
-  if (shape.length === 2 && shape[1] > 1) {
+  if (cols > 1 && !sliding) {
     const sliced: PredictionArrays = {};
     for (const [key, arr] of Object.entries(full)) {
       if (
@@ -207,40 +271,35 @@ export function readNpzDayRange(
     return sliced;
   }
 
-  const nHoursTotal = shape.length === 2 ? shape[0] : shape[0];
   const hStart = start * 24;
-  const hEnd = Math.min(endExclusive * 24, nHoursTotal);
-  const hourCount = Math.max(0, hEnd - hStart);
-  const nDayRows = Math.floor(hourCount / 24);
+  const hEnd = endExclusive * 24;
 
   const sliced: PredictionArrays = {};
   for (const [key, arr] of Object.entries(full)) {
-    if (
-      Array.isArray(arr) &&
-      arr.length > 1 &&
-      Array.isArray(arr[0]) &&
-      arr[0].length === 1
-    ) {
-      const hourSlice: number[] = [];
-      for (let r = hStart; r < hEnd; r++) {
-        hourSlice.push(arr[r]?.[0] ?? 0);
-      }
-      const reshaped: number[][] = [];
-      for (let d = 0; d < nDayRows; d++) {
-        reshaped.push(hourSlice.slice(d * 24, (d + 1) * 24));
-      }
-      sliced[key] = reshaped;
-    } else if (Array.isArray(arr) && arr.length === 1 && Array.isArray(arr[0])) {
-      const flat = arr[0];
-      const hourSlice = flat.slice(hStart, hEnd);
-      const reshaped: number[][] = [];
-      for (let d = 0; d < nDayRows; d++) {
-        reshaped.push(hourSlice.slice(d * 24, (d + 1) * 24));
-      }
-      sliced[key] = reshaped;
-    } else {
+    if (!is2DArray(arr)) {
       sliced[key] = arr;
+      continue;
     }
+
+    const arrCols = arr[0]?.length ?? 0;
+    let hourly: number[] = [];
+
+    if (arrCols > 1 && sliding) {
+      // Overlapping sequence windows -> stitch into a single hourly series.
+      hourly = stitchSlidingWindowsToHourly(arr);
+    } else if (arrCols === 1 && arr.length > 0) {
+      // Hour-major as (N, 1)
+      hourly = arr.map((r) => r[0] ?? 0);
+    } else if (arr.length === 1 && arrCols > 0) {
+      // Flat stored as (1, N)
+      hourly = arr[0].slice();
+    } else if (arrCols > 1 && !sliding) {
+      // Non-overlapping day-major; flatten to hourly for shared slicing path.
+      hourly = arr.flat();
+    }
+
+    const hourSlice = hourly.slice(Math.max(0, hStart), Math.min(hEnd, hourly.length));
+    sliced[key] = reshapeHourlyToDayRows(hourSlice, 24);
   }
   return sliced;
 }
