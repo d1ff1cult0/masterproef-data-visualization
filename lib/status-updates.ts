@@ -1050,5 +1050,270 @@ export const STATUS_UPDATES: StatusUpdate[] = [
             "This leaves me a bit worried for my thesis, and I am unsure what to do next. ",
       },
     ],
+  },
+  {
+    id: "07",
+    number: 7,
+    title: "Notebooks 13-27: Closing the gap to LEAR",
+    date: "",
+    content: [
+      {
+        type: "paragraph",
+        text: "In this update I go over notebooks 13 to 27. The main goal of this period was to improve the PyTorch Transformer, understand why LEAR is better at point forecasts, and try to close the gap between them. I also tested some alternative approaches like PatchTST, ensembles, conformal prediction, and feature engineering. At the end I will also mention which notebooks are probably not worth including in the final thesis because the results are not interesting enough.",
+      },
+      { type: "heading", level: 2, text: "Notebook 13: Improved PyTorch Transformer" },
+      {
+        type: "paragraph",
+        text: "This notebook tries to find out why the PyTorch transformer has a MAE of around 19 and systematically improves it. I tested several things: using the median of the JSU distribution instead of the mean for point forecasts, an improved training recipe (AdamW optimizer, gradient clipping, cosine LR schedule, 100 epochs), and architectural changes (Pre-LayerNorm, decoder self-attention). After that I ran Optuna hyperparameter optimization (50 trials).",
+      },
+      {
+        type: "table",
+        table: {
+          caption: "Progressive improvements to the PyTorch Transformer.",
+          headers: ["Configuration", "MAE", "Improvement"],
+          rows: [
+            ["Baseline PyTorch", 19.39, "—"],
+            ["+ Median forecast", 19.02, "+1.9%"],
+            ["+ Improved training recipe", 17.97, "+7.3%"],
+            ["+ Architecture changes", 17.94, "+7.5%"],
+            ["+ Optuna HPO (50 trials, 10 runs)", 17.58, "+9.3%"],
+          ],
+        },
+      },
+      {
+        type: "paragraph",
+        text: "The best configuration found by Optuna uses 8 attention heads, d_model=384, 2 encoder layers, 1 decoder layer, ff_dim=128, dropout=0.174, lr=4.36e-4, and batch size 128. The improvement from 19.39 to 17.58 is decent but still far from LEAR (14.24). The training recipe changes contributed the most.",
+      },
+      { type: "heading", level: 2, text: "Notebooks 15 & 16: Train/Val Split and Test Window Study" },
+      {
+        type: "paragraph",
+        text: "These two notebooks run the same grid study for both the Transformer (Nb15) and LEAR (Nb16). I tested 3 train/val split ratios (90/10, 80/20, 70/30) combined with 4 test window lengths (3, 6, 9, 12 months), giving 12 configurations each.",
+      },
+      {
+        type: "table",
+        table: {
+          caption: "Best MAE per test window length for Transformer vs LEAR.",
+          headers: ["Test window", "Transformer MAE", "LEAR MAE", "Gap"],
+          rows: [
+            ["3 months", 16.03, 14.33, 1.70],
+            ["6 months", 19.35, 16.78, 2.57],
+            ["9 months", 22.02, 18.09, 3.93],
+            ["12 months", 20.74, 18.65, 2.09],
+          ],
+        },
+      },
+      {
+        type: "paragraph",
+        text: "The main findings are: (1) shorter test windows give better MAE for both models, which shows that electricity prices are non-stationary and models degrade over time, (2) more training data (90/10 split) is generally better, and (3) LEAR consistently outperforms the Transformer across all configurations. The gap ranges from 1.7 to 3.9 MAE points. This is important because it shows the gap is not just an artifact of one specific setup.",
+      },
+      { type: "heading", level: 2, text: "Notebook 17: LEAR-Transformer Ensemble" },
+      {
+        type: "paragraph",
+        text: "Since both LEAR and the Transformer have different strengths, I tested combining them. I compared four approaches: standalone LEAR, standalone Transformer, a weighted average ensemble, and a residual ensemble (Transformer trained to predict LEAR's errors).",
+      },
+      {
+        type: "table",
+        table: {
+          caption: "Ensemble comparison results.",
+          headers: ["Model", "MAE", "CRPS", "R²"],
+          rows: [
+            ["Weighted average ensemble", "15.69 ± 0.53", "—", 0.678],
+            ["LEAR (standalone)", 16.64, "—", 0.579],
+            ["Transformer (standalone)", "18.47 ± 1.26", "13.63 ± 0.99", 0.574],
+            ["Residual ensemble", "20.87 ± 2.85", "15.25 ± 2.00", 0.426],
+          ],
+        },
+      },
+      {
+        type: "paragraph",
+        text: "The weighted average ensemble (alpha * LEAR + (1-alpha) * Transformer, with alpha around 0.4-0.5) gives the best MAE of 15.69, which is better than both standalone models. This makes sense because LEAR is good at structured lag patterns while the Transformer captures different dynamics. The residual ensemble does not work well, the Transformer struggles to learn LEAR's error patterns. This is an important result because it shows that combining both models is a viable strategy.",
+      },
+      { type: "heading", level: 2, text: "Notebook 19: Rolling Recalibration" },
+      {
+        type: "paragraph",
+        text: "LEAR recalibrates daily using a rolling window. I wondered if doing the same for the Transformer would help close the gap. I tested monthly rolling retraining with different lookback windows (6, 12, 18, 24 months).",
+      },
+      {
+        type: "table",
+        table: {
+          caption: "Rolling recalibration results. All rolling variants perform worse than the baseline.",
+          headers: ["Configuration", "MAE", "CRPS", "R²"],
+          rows: [
+            ["Baseline (train once)", 18.36, 13.63, 0.559],
+            ["Rolling 6-month window", 19.35, 14.10, 0.507],
+            ["Rolling 12-month window", 19.74, 14.86, 0.507],
+            ["Rolling 18-month window", 20.34, 15.25, 0.487],
+            ["Rolling 24-month window", 19.28, 14.91, 0.528],
+            ["LEAR (daily rolling, reference)", 14.24, "—", 0.724],
+          ],
+        },
+      },
+      {
+        type: "paragraph",
+        text: "Rolling recalibration actually made the Transformer worse in all cases. This is a negative result but an important one: LEAR's advantage does not come from its daily recalibration strategy. The Transformer apparently needs more data to learn good patterns, and restricting the training window hurts more than it helps with adapting to recent trends.",
+      },
+      { type: "heading", level: 2, text: "Notebook 20: Probabilistic LEAR Baseline" },
+      {
+        type: "paragraph",
+        text: "To fairly compare the probabilistic performance of the Transformer against LEAR, I implemented two probabilistic versions of LEAR: Conformal LEAR (wrapping LEAR point forecasts with conformal prediction intervals) and QLEAR (quantile regression version of LEAR).",
+      },
+      {
+        type: "table",
+        table: {
+          caption: "Probabilistic LEAR vs Transformer comparison.",
+          headers: ["Model", "MAE", "CRPS", "PICP", "MPIW"],
+          rows: [
+            ["Transformer (reference)", 17.40, 14.20, 0.90, 93],
+            ["Conformal LEAR", 29.07, 18.41, 0.781, 88.75],
+            ["QLEAR (quantile regression)", 30.49, 23.33, 0.427, 50.74],
+          ],
+        },
+      },
+      {
+        type: "paragraph",
+        text: "The Transformer clearly wins on probabilistic metrics with a CRPS of 14.20 vs 18.41 for Conformal LEAR and 23.33 for QLEAR. Note: the LEAR MAE values here are unusually high (29-30) because of a data leakage fix applied to the LEAR code that removed current-day features. The cached predictions may need regeneration. Despite this, the comparison is still valid for showing that the Transformer provides much better calibrated uncertainty estimates than LEAR-based probabilistic methods.",
+      },
+      { type: "heading", level: 2, text: "Notebook 23: Sequential Conformal Prediction" },
+      {
+        type: "paragraph",
+        text: "This notebook applies post-hoc conformal prediction to recalibrate the Transformer's prediction intervals online, without any retraining. I tested two methods: EnbPI (using a 60-day rolling buffer) and Adaptive Conformal Prediction (ACP).",
+      },
+      {
+        type: "table",
+        table: {
+          caption: "Sequential conformal prediction results. Target coverage is 95%.",
+          headers: ["Method", "PICP", "MPIW", "CRPS", "MAE"],
+          rows: [
+            ["Uncalibrated Transformer (JSU)", 0.849, 65.12, 13.27, 17.80],
+            ["EnbPI (60-day buffer)", 0.940, 90.68, 12.97, 17.80],
+            ["Adaptive Conformal Prediction", 0.950, 96.48, 13.03, 17.80],
+          ],
+        },
+      },
+      {
+        type: "paragraph",
+        text: "This is one of the most important results. Adaptive Conformal Prediction achieves almost perfect 95% coverage (PICP = 0.950, with only 0.05% error from the target) and slightly improves CRPS, all without retraining. The point forecast (MAE) stays the same since conformal prediction only adjusts the intervals. This means we can get well-calibrated prediction intervals from the Transformer for free.",
+      },
+      { type: "heading", level: 2, text: "Notebook 24: V1 vs V2 Dataset Comparison" },
+      {
+        type: "paragraph",
+        text: "I collected additional exogenous features (nuclear forecasts, wind forecasts, DE prices, balance indicators, solar forecasts) to create a V2 dataset with 37 features compared to V1's 28. I then compared Transformer performance on both.",
+      },
+      {
+        type: "table",
+        table: {
+          caption: "V1 vs V2 comparison. V2 adds 9 new features.",
+          headers: ["Dataset", "Overall MAE", "Low prices MAE", "Normal MAE", "High prices MAE"],
+          rows: [
+            ["V1 (28 features)", "18.15 ± 0.18", 28.05, 15.22, 18.96],
+            ["V2 (37 features)", "19.77 ± 1.80", 21.77, 17.25, 15.11],
+          ],
+        },
+      },
+      {
+        type: "paragraph",
+        text: "V2 is 8.9% worse overall but shows a clear trade-off: it is much better at extreme prices (low prices: 28.05 -> 21.77, high prices: 18.96 -> 15.11) but worse at normal prices (15.22 -> 17.25). The normal regime dominates the average, so overall MAE goes up. This motivated the feature selection work in Notebook 26.",
+      },
+      { type: "heading", level: 2, text: "Notebooks 25 & 26: Architecture Optimization and Feature Selection" },
+      {
+        type: "paragraph",
+        text: "Notebook 25 does a systematic sweep over regularization, model size, and learning rate schedules. Notebook 26 tests which V2 features actually help and also experiments with regime-weighted training to improve extreme price prediction.",
+      },
+      { type: "heading", level: 3, text: "Notebook 25: Key findings" },
+      {
+        type: "list",
+        items: [
+          "All experiments show best_epoch = 1 out of 21. The model overfits after a single epoch of training. This is the fundamental bottleneck.",
+          "Regularization (weight decay, dropout, gradient clipping) does not help, because the problem is not gradual overfitting but first-epoch overshoot.",
+          "Smaller models generalize better: d192_L3 (MAE=17.03, 840K params) beats d384_L2 (MAE=18.61) significantly.",
+          "LR scheduling helps slightly: plateau scheduler with lr=5e-4 gives MAE=17.22.",
+          "Final optimized Transformer: MAE = 18.02 ± 0.65. Only 3.4% of the gap to LEAR was closed.",
+        ],
+      },
+      { type: "heading", level: 3, text: "Notebook 26: Key findings" },
+      {
+        type: "list",
+        items: [
+          "V1+wind (adding FR_Wind, DE_Wind, BE_Wind_Offshore to V1 features) gives the best MAE = 16.42. This is the best single-model result so far.",
+          "Nuclear features help a bit (MAE=17.03), but wind features are more valuable.",
+          "Adding all V2 features or solar data hurts performance due to noise and missing values (FR_Solar has 17.1% missing).",
+          "Regime-weighted training (upweighting extreme price samples 2x, 3x, 5x in the loss) did not improve overall MAE.",
+        ],
+      },
+      { type: "heading", level: 2, text: "Notebook 27: Closing the Gap" },
+      {
+        type: "paragraph",
+        text: "This notebook combines all findings from the previous notebooks and tests new directions to get the Transformer as close to LEAR as possible. I test 5 things: combining the best architecture with the best features, a learning rate and batch size grid, explicit price lag features (like LEAR uses), different input window sizes, and ensembling multiple runs.",
+      },
+      {
+        type: "table",
+        table: {
+          caption: "Notebook 27 results. Each improvement builds on the previous best.",
+          headers: ["Experiment", "MAE", "Notes"],
+          rows: [
+            ["P1: d192_L3 + V1+wind", "16.56 ± 0.38", "Combining best arch + best features"],
+            ["P2: + LR/BS optimization", "15.82 ± 0.37", "lr=5e-4, bs=32, cosine scheduler"],
+            ["P3: + Explicit price lags", "15.90 ± 0.46", "Adding d-1, d-2, d-3, d-7 price lags"],
+            ["P4: Input window sweep", "—", "168h (7 days) remains best"],
+            ["LEAR (reference)", 14.24, ""],
+          ],
+        },
+      },
+      {
+        type: "paragraph",
+        text: "The best single-model Transformer result is around MAE = 15.82, achieved by combining the d192_L3 architecture with V1+wind features and cosine LR scheduling. The explicit price lags (mimicking LEAR's lag structure) did not help as much as expected, probably because the 168h input window already contains this information implicitly. The remaining gap to LEAR is about 1.6 MAE points (11%).",
+      },
+      {
+        type: "paragraph",
+        text: "Combined with the weighted average ensemble from Notebook 17 (which also achieved MAE = 15.69), this shows that we can get the Transformer within 1.5-2 points of LEAR, but fully closing the gap is very hard. The Transformer's main advantage remains its probabilistic output, which LEAR cannot match.",
+      },
+      { type: "heading", level: 2, text: "Summary of Progress" },
+      {
+        type: "table",
+        table: {
+          caption: "Overall progress from notebooks 13 to 27.",
+          headers: ["Milestone", "MAE", "Gap to LEAR"],
+          rows: [
+            ["Starting point (Nb13 baseline)", 19.39, 5.15],
+            ["Optuna HPO (Nb13)", 17.58, 3.34],
+            ["V1+wind features (Nb26)", 16.42, 2.18],
+            ["Best single model (Nb27)", 15.82, 1.58],
+            ["Weighted ensemble (Nb17)", 15.69, 1.45],
+            ["LEAR", 14.24, "—"],
+          ],
+        },
+      },
+      {
+        type: "paragraph",
+        text: "Overall I closed about 72% of the initial gap to LEAR (from 5.15 to 1.45 MAE points). But the Transformer has important advantages that LEAR does not have: much better probabilistic forecasting (CRPS 14.20 vs 18.41), and near-perfect uncertainty calibration with conformal prediction (PICP = 0.950). The ensemble approach shows that combining both is the best strategy.",
+      },
+      { type: "heading", level: 2, text: "Notebooks not worth including in detail" },
+      {
+        type: "paragraph",
+        text: "Some notebooks produced results that are not interesting enough for the thesis:",
+      },
+      {
+        type: "list",
+        items: [
+          "Notebook 14 (Keras vs PyTorch comparison): Just validates that both frameworks give similar results. Useful for implementation correctness but not scientifically interesting.",
+          "Notebook 21 (LEAR as decoder feature): Adding LEAR's day-ahead forecast as a decoder feature actually made MAE worse by 4.2%. The Transformer cannot effectively learn to refine LEAR's predictions this way.",
+          "Notebook 22 (PatchTST): Replacing hourly tokens with 24h patches made MAE 14% worse (20.03 vs 17.40). The hourly resolution is important for electricity prices and patch-based aggregation loses too much intra-day structure.",
+        ],
+      },
+      {
+        type: "paragraph",
+        text: "These notebooks are still good to mention briefly as negative results (showing what does not work), but they do not need a full analysis in the thesis.",
+      },
+      { type: "heading", level: 2, text: "Next steps" },
+      {
+        type: "list",
+        items: [
+          "Run notebook 27 and analyse the full results (the notebook was just created and has not been executed yet)",
+          "Possibly try ensembling the improved Transformer (Nb27) with LEAR to see if the ensemble also improves",
+          "Continue writing the thesis: methodology chapter and results chapter",
+          "Prepare the final comparison table for the thesis with all models and approaches",
+        ],
+      },
+    ],
   }
 ];

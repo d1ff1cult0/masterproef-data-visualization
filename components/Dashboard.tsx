@@ -8,9 +8,10 @@ import PredictionsChart from "./PredictionsChart";
 import StatusUpdateView from "./StatusUpdateView";
 import BestModelsLanding from "./BestModelsLanding";
 import EDAView from "./EDAView";
+import AnalysisView from "./AnalysisView";
 import type { SelectedModel } from "@/lib/types";
 
-type Tab = "eda" | "metrics" | "predictions" | "status-updates";
+type Tab = "eda" | "metrics" | "predictions" | "analysis" | "status-updates";
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   {
@@ -37,6 +38,15 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     icon: (
       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" />
+      </svg>
+    ),
+  },
+  {
+    id: "analysis",
+    label: "Analysis",
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714a2.25 2.25 0 00.659 1.591L19 14.5M14.25 3.104c.251.023.501.05.75.082M19 14.5l-1.756-1.756a2.25 2.25 0 00-1.591-.659H8.347a2.25 2.25 0 00-1.591.659L5 14.5m14 0v4.25A2.25 2.25 0 0116.75 21h-9.5A2.25 2.25 0 015 18.75V14.5" />
       </svg>
     ),
   },
@@ -168,9 +178,11 @@ export default function Dashboard() {
                 />
               ) : activeTab === "metrics" ? (
                 <MetricsView selectedModels={selectedModels} />
-              ) : (
+              ) : activeTab === "predictions" ? (
                 <PredictionsChart selectedModels={selectedModels} />
-              )}
+              ) : activeTab === "analysis" ? (
+                <AnalysisView selectedModels={selectedModels} />
+              ) : null}
             </main>
           </>
         )}
