@@ -1183,19 +1183,13 @@ export const STATUS_UPDATES: StatusUpdate[] = [
       {
         type: "paragraph",
         text:
-          "In notebook 21 I fed LEAR's day-ahead forecast in as an extra decoder feature for the transformer. MAE got worse by about 4%, so I treat that as a short negative result in the thesis rather than a full chapter.",
-      },
-      { type: "heading", level: 2, text: "Notebook 22: PatchTST style patches" },
-      {
-        type: "paragraph",
-        text:
-          "In notebook 22 I tried PatchTST style patches (24 hour blocks instead of hourly tokens). MAE went up by roughly 14% compared to the hourly model, so the fine hourly structure really matters for Belgian prices.",
+          "In notebook 21 I fed LEAR's day-ahead forecast in as an extra decoder feature for the transformer. MAE got worse by about 4%, so this is also not very promising.",
       },
       { type: "heading", level: 2, text: "Notebook 23: Sequential conformal prediction on the transformer" },
       {
         type: "paragraph",
         text:
-          "In notebook 23 I applied sequential conformal methods on top of the transformer without retraining, mainly EnbPI with a 60 day buffer and adaptive conformal prediction (ACP), to fix coverage of the prediction intervals online.",
+          "In notebook 23 I applied sequential conformal methods on top of the transformer without retraining, mainly rolling residual conformal with a 60 day buffer and adaptive conformal prediction (ACP), to fix coverage of the prediction intervals online.",
       },
       {
         type: "table",
@@ -1204,7 +1198,7 @@ export const STATUS_UPDATES: StatusUpdate[] = [
           headers: ["Method", "PICP", "MPIW", "CRPS", "MAE"],
           rows: [
             ["Uncalibrated Transformer (JSU)", 0.849, 65.12, 13.27, 17.80],
-            ["EnbPI (60-day buffer)", 0.940, 90.68, 12.97, 17.80],
+            ["Rolling residual conformal (60-day buffer)", 0.940, 90.68, 12.97, 17.80],
             ["Adaptive Conformal Prediction", 0.950, 96.48, 13.03, 17.80],
           ],
         },
@@ -1212,7 +1206,12 @@ export const STATUS_UPDATES: StatusUpdate[] = [
       {
         type: "paragraph",
         text:
-          "ACP basically hit the 95% coverage target and helped CRPS a little, while point forecasts stayed the same because only the intervals move. That felt like one of the most practical outcomes of the whole block of experiments.",
+          "ACP basically hit the 95% coverage target and helped CRPS a little, while point forecasts stayed the same because only the intervals move. Although these results seem good, it basically means the transformer is not able to learn the price distribution well enough to make good predictions on its own.",
+      },
+      {
+        type: "figure",
+        images: [{ src: "/status-updates/update7/nb23.png", alt: "Notebook 23: sequential conformal prediction on the transformer" }],
+        caption: "Notebook 23: sequential conformal prediction on the transformer.",
       },
       { type: "heading", level: 2, text: "Notebook 24: V1 vs V2 feature set" },
       {
@@ -1240,7 +1239,7 @@ export const STATUS_UPDATES: StatusUpdate[] = [
       {
         type: "paragraph",
         text:
-          "In notebook 25 I swept regularization, model size, and learning rate schedules. The uncomfortable pattern is that the best epoch is often basically the first one out of 21, so the issue looks like early overshoot rather than slow overfitting. Extra weight decay and dropout did not fix that story. Smaller models helped: d192 with three layers landed near MAE 17.03 with under a million parameters, much better than the bigger d384 setup around 18.61. A plateau style schedule around lr 5e-4 gave a small bump. The notebook level aggregate I reported there was about MAE 18.02 plus minus 0.65, so only a few percent of the LEAR gap closed from that sweep alone.",
+          "In notebook 25 I swept regularization (adamw, gradint clipping, dropout, weight decay), model size, and learning rate schedules. This is because i saw a pattern that the best epoch is often basically the first one, so the issue looks like early overshoot rather than slow overfitting. Extra weight decay and dropout did not fix that story. Smaller models helped: d192 with three layers landed near MAE 17.03 with under a million parameters, much better than the bigger d384 setup around 18.61. A plateau style schedule around lr 5e-4 gave a small bump.",
       },
       { type: "heading", level: 2, text: "Notebook 26: Feature selection and regime weighting" },
       {
@@ -1263,7 +1262,7 @@ export const STATUS_UPDATES: StatusUpdate[] = [
             ["P1: d192_L3 + V1+wind", "16.56 ± 0.38", "Combining best arch + best features"],
             ["P2: + LR/BS optimization", "15.82 ± 0.37", "lr=5e-4, bs=32, cosine scheduler"],
             ["P3: + Explicit price lags", "15.90 ± 0.46", "Adding d-1, d-2, d-3, d-7 price lags"],
-            ["P4: Input window sweep", "n/a", "168h (7 days) remains best"],
+            ["P4: Input window sweep", "16.24 ± 0.46", "168h (7 days) best among 72/120/168/336 h"],
             ["LEAR (reference)", 14.24, ""],
           ],
         },
@@ -1271,13 +1270,7 @@ export const STATUS_UPDATES: StatusUpdate[] = [
       {
         type: "paragraph",
         text:
-          "The best single transformer run I got was around MAE 15.82 after combining d192_L3, V1 plus wind, and cosine scheduling on the learning rate. Extra hand built price lags barely moved the needle, probably because a 168 hour window already carries similar information. LEAR is still near 14.24, so roughly 1.6 MAE points remain, on the order of ten percent relative gap.",
-      },
-      { type: "heading", level: 2, text: "Takeaways" },
-      {
-        type: "paragraph",
-        text:
-          "Together with the simple weighted ensemble from notebook 17 (also near 15.7 MAE), the picture is that I can get close to LEAR on points if I stack tricks, but not match it cleanly. Where the transformer still shines is full distributions and conformal fixes on top, which LEAR does not natively offer.",
+          "The best single transformer run I got was around MAE 15.82 after combining d192_L3, V1 plus wind, and cosine scheduling on the learning rate. Extra hand built price lags barely moved the needle, probably because a 168 hour window already carries similar information. LEAR is still near 14.24, so roughly 1.6 MAE or 10% remain to close the gap.",
       },
       { type: "heading", level: 2, text: "Summary of progress" },
       {
@@ -1290,7 +1283,7 @@ export const STATUS_UPDATES: StatusUpdate[] = [
             ["Optuna HPO (Nb13)", 17.58, 3.34],
             ["V1+wind features (Nb26)", 16.42, 2.18],
             ["Best single model (Nb27)", 15.82, 1.58],
-            ["Weighted ensemble (Nb17)", 15.69, 1.45],
+            ["Ensemble of transformers (Nb28)", 14.40, 0.16],
             ["LEAR", 14.24, "(ref)"],
           ],
         },
@@ -1298,22 +1291,18 @@ export const STATUS_UPDATES: StatusUpdate[] = [
       {
         type: "paragraph",
         text:
-          "If you measure from the first PyTorch baseline in notebook 13 to the best ensemble style numbers, I closed a large share of the MAE gap to LEAR, but a slice of about 1.5 points is still there. I am fine with that trade because the transformer side still wins on CRPS and I can get essentially nominal 95% coverage with ACP without retraining. For a practical story, blending LEAR and the transformer still looks like the sweet spot.",
+          "If you measure from the first PyTorch baseline in notebook 13 to the best ensemble style numbers, I closed a large share of the MAE gap to LEAR, but a slice of about 1.5 points is still there.",
       },
-      { type: "heading", level: 2, text: "Thesis scope for smaller notebooks" },
+      { type: "heading", level: 2, text: "Notebook 29: Quarterly vs hourly prices" },
       {
         type: "paragraph",
         text:
-          "For the thesis I will keep notebook 14 as a short sanity check (already part of the intro here). Notebooks 21 and 22 are one paragraph each as negative results, not full sections.",
+          "I thought I had already fixed the quarterly-versus-hourly price values issue in the pipeline, but I had not, I only noticed when I checked again at the end. The strange part is that keeping only the hourly values actually performed worse on the headline point error than using the mean of the quarterly values, even though the hourly-only version looked much better on variance.",
       },
-      { type: "heading", level: 2, text: "Next steps" },
       {
-        type: "list",
-        items: [
-          "Finish running and cleaning up notebook 27 if anything is still pending, then fold the best lines into the results chapter.",
-          "Maybe try ensembling the notebook 27 transformer with LEAR to see if the blend from notebook 17 gets even better.",
-          "Keep writing methodology and results, and prepare one clear comparison table for the defence pack.",
-        ],
+        type: "figure",
+        images: [{ src: "/status-updates/update7/nb29.png", alt: "Notebook 29: quarterly vs hourly Belgian price handling" }],
+        caption: "Notebook 29: comparison of quarterly aggregation vs hourly-only prices.",
       },
     ],
   }
