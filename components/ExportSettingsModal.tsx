@@ -5,8 +5,11 @@ import type { ExportSettings } from "./ExportableChart";
 interface ExportSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onExport: (settings: ExportSettings) => void;
+  onExport: (settings: ExportSettings) => void | Promise<void>;
   defaultSettings: ExportSettings;
+  modalTitle?: string;
+  modalDescription?: string;
+  submitButtonLabel?: string;
 }
 
 const DPI_OPTIONS = [
@@ -20,10 +23,13 @@ export default function ExportSettingsModal({
   onClose,
   onExport,
   defaultSettings,
+  modalTitle = "Export chart as PNG",
+  modalDescription = "Configure export options for papers and presentations.",
+  submitButtonLabel = "Export PNG",
 }: ExportSettingsModalProps) {
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = e.currentTarget;
     const settings: ExportSettings = {
@@ -33,7 +39,7 @@ export default function ExportSettingsModal({
       dpi: Number((form.elements.namedItem("dpi") as HTMLSelectElement)?.value) || 300,
       backgroundColor: (form.elements.namedItem("backgroundColor") as HTMLInputElement)?.value || "#ffffff",
     };
-    onExport(settings);
+    await onExport(settings);
   };
 
   return (
@@ -45,10 +51,10 @@ export default function ExportSettingsModal({
       />
       <div className="relative bg-white rounded-lg shadow-xl border border-zinc-200 p-6 max-w-md w-full mx-4">
         <h3 className="text-base font-semibold text-zinc-900 mb-4">
-          Export chart as PNG
+          {modalTitle}
         </h3>
         <p className="text-sm text-zinc-500 mb-4">
-          Configure export options for papers and presentations.
+          {modalDescription}
         </p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="flex items-center justify-between">
@@ -146,7 +152,7 @@ export default function ExportSettingsModal({
               type="submit"
               className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors"
             >
-              Export PNG
+              {submitButtonLabel}
             </button>
           </div>
         </form>

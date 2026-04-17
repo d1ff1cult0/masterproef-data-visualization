@@ -22,6 +22,12 @@ import {
 import type { EDAResult, SummaryStatRow } from "@/lib/eda";
 import { ZoomableTimeSeriesChart } from "./ZoomableTimeSeriesChart";
 import { ExportableChart } from "./ExportableChart";
+import ExportSettingsModal from "./ExportSettingsModal";
+import type { ExportSettings } from "./ExportableChart";
+import {
+  EdaChartExportProvider,
+  useEdaChartExportRegistry,
+} from "@/lib/eda-chart-export-context";
 
 // ──────────────────── Color Utilities ────────────────────
 
@@ -106,13 +112,18 @@ function StatCard({ label, value, sub }: { label: string; value: string | number
   );
 }
 
+const ALL_SECTIONS = [
+  "overview", "summary", "timeseries", "distribution", "negative", "temporal",
+  "heatmaps", "weekday", "correlation", "crossborder", "load", "renewables",
+  "flows", "acf", "features", "outliers", "pairplot", "volatility", "yoy",
+];
+
 // ──────────────────── Main Component ────────────────────
 
 export default function EDAView() {
   const [data, setData] = useState<EDAResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set(["overview", "summary"]));
 
   useEffect(() => {
     fetch("/api/eda")
@@ -123,23 +134,6 @@ export default function EDAView() {
       .then((d) => setData(d))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, []);
-
-  const toggle = useCallback((id: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-
-  const expandAll = useCallback(() => {
-    setExpanded(new Set(ALL_SECTIONS));
-  }, []);
-
-  const collapseAll = useCallback(() => {
-    setExpanded(new Set());
   }, []);
 
   if (loading) {
@@ -165,6 +159,55 @@ export default function EDAView() {
     );
   }
 
+  return (
+    <EdaChartExportProvider>
+      <EDAViewContent data={data} />
+    </EdaChartExportProvider>
+  );
+}
+
+function EDAViewContent({ data }: { data: EDAResult }) {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set(["overview", "summary"]));
+  const [bulkExportOpen, setBulkExportOpen] = useState(false);
+  const [bulkExportSettings, setBulkExportSettings] = useState<ExportSettings>({
+    includeTitle: true,
+    fontSize: 12,
+    boldLabels: true,
+    dpi: 300,
+    backgroundColor: "#ffffff",
+  });
+  const edaRegistry = useEdaChartExportRegistry();
+
+  const toggle = useCallback((id: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const expandAll = useCallback(() => {
+    setExpanded(new Set(ALL_SECTIONS));
+  }, []);
+
+  const collapseAll = useCallback(() => {
+    setExpanded(new Set());
+  }, []);
+
+  const runBulkExport = useCallback(
+    async (settings: ExportSettings) => {
+      setBulkExportSettings(settings);
+      expandAll();
+      await new Promise((r) => requestAnimationFrame(r));
+      await new Promise((r) => requestAnimationFrame(r));
+      await new Promise((r) => setTimeout(r, 600));
+      await edaRegistry?.exportAllCharts(settings);
+      setBulkExportOpen(false);
+    },
+    [edaRegistry, expandAll]
+  );
+
   const S = (id: string, title: string, desc: string, children: React.ReactNode) => (
     <Section id={id} title={title} description={desc} expanded={expanded.has(id)} onToggle={toggle}>
       {children}
@@ -173,13 +216,29 @@ export default function EDAView() {
 
   return (
     <div className="p-6 space-y-3 max-w-[1400px] mx-auto">
+      <ExportSettingsModal
+        isOpen={bulkExportOpen}
+        onClose={() => setBulkExportOpen(false)}
+        onExport={runBulkExport}
+        defaultSettings={bulkExportSettings}
+        modalTitle="Export all charts as PNG"
+        modalDescription="All sections will be expanded first. Each figure downloads as its own file with a descriptive name (same options apply to every chart)."
+        submitButtonLabel="Export all PNG"
+      />
       {/* Header */}
       <div className="flex items-center justify-between mb-2">
         <div>
           <h2 className="text-lg font-bold text-zinc-900">Exploratory Data Analysis</h2>
           <p className="text-xs text-zinc-500 mt-0.5">Belgian Electricity Prices (ENTSO-E) &mdash; {data.overview.totalRows.toLocaleString()} hourly observations</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setBulkExportOpen(true)}
+            className="text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-md shadow-sm transition-colors"
+          >
+            Export all PNG
+          </button>
           <button onClick={expandAll} className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50 transition-colors">Expand All</button>
           <button onClick={collapseAll} className="text-xs text-zinc-500 hover:text-zinc-700 px-2 py-1 rounded hover:bg-zinc-100 transition-colors">Collapse All</button>
         </div>
@@ -256,7 +315,11 @@ export default function EDAView() {
       {/* ────── 3. Price Time Series ────── */}
       {S("timeseries", "Price Time Series", "Daily average with 7-day rolling mean/std", (
         <div className="space-y-6">
-          <ExportableChart title="Daily Average Price with Rolling Mean & Std Band" filename="price-timeseries">
+          <ExportableChart
+            title="Daily Average Price with Rolling Mean & Std Band"
+            filename="eda_BE_hourly_price_daily_average_7d_rolling_mean_and_std_band"
+            edaRegister={{ key: "eda-ts-daily-avg-roll", order: 0 }}
+          >
           <div>
             <ZoomableTimeSeriesChart data={data.priceSeries} xDataKey="date" height={350} formatXLabel={(v) => v.slice(5)}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -269,7 +332,11 @@ export default function EDAView() {
             </ZoomableTimeSeriesChart>
           </div>
           </ExportableChart>
-          <ExportableChart title="7-Day Rolling Standard Deviation" filename="rolling-std">
+          <ExportableChart
+            title="7-Day Rolling Standard Deviation"
+            filename="eda_BE_hourly_price_7d_rolling_standard_deviation"
+            edaRegister={{ key: "eda-ts-rolling-std", order: 1 }}
+          >
           <div>
             <ZoomableTimeSeriesChart data={data.priceSeries} xDataKey="date" height={200} chartType="LineChart" formatXLabel={(v) => v.slice(5)}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -280,7 +347,11 @@ export default function EDAView() {
             </ZoomableTimeSeriesChart>
           </div>
           </ExportableChart>
-          <ExportableChart title="Monthly Average Prices" filename="monthly-avg-prices">
+          <ExportableChart
+            title="Monthly Average Prices"
+            filename="eda_BE_hourly_price_monthly_mean_and_median_bars"
+            edaRegister={{ key: "eda-ts-monthly", order: 2 }}
+          >
           <div>
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={data.monthlyAvgPrices}>
@@ -308,8 +379,11 @@ export default function EDAView() {
             <StatCard label="Excess Kurtosis" value={`${data.priceDistribution.stats.kurtosis}`} sub={data.priceDistribution.stats.kurtosis > 0 ? "Heavy-tailed" : "Light-tailed"} />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h4 className="text-xs font-medium text-zinc-600 mb-2">Price Histogram</h4>
+            <ExportableChart
+              title="Price Histogram"
+              filename="eda_BE_hourly_price_distribution_histogram"
+              edaRegister={{ key: "eda-dist-histogram", order: 10 }}
+            >
               <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={data.priceDistribution.histogram}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -323,9 +397,12 @@ export default function EDAView() {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
-            </div>
-            <div>
-              <h4 className="text-xs font-medium text-zinc-600 mb-2">Q-Q Plot (Normal)</h4>
+            </ExportableChart>
+            <ExportableChart
+              title="Q-Q Plot (Normal)"
+              filename="eda_BE_hourly_price_normal_qq_plot"
+              edaRegister={{ key: "eda-dist-qq", order: 11 }}
+            >
               <ResponsiveContainer width="100%" height={280}>
                 <ScatterChart>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -343,10 +420,14 @@ export default function EDAView() {
                   />
                 </ScatterChart>
               </ResponsiveContainer>
-            </div>
+            </ExportableChart>
           </div>
+          <ExportableChart
+            title="Box Plot Summary (Whiskers and IQR)"
+            filename="eda_BE_hourly_price_box_plot_summary_visual"
+            edaRegister={{ key: "eda-dist-box", order: 12 }}
+          >
           <div>
-            <h4 className="text-xs font-medium text-zinc-600 mb-2">Box Plot Summary</h4>
             <div className="bg-zinc-50 rounded-lg p-4 border border-zinc-100">
               <div className="flex items-center gap-6 text-xs flex-wrap">
                 <span><b>Min:</b> {data.priceDistribution.boxPlot.min}</span>
@@ -377,9 +458,12 @@ export default function EDAView() {
               </div>
             </div>
           </div>
-          {/* Price Duration Curve */}
-          <div>
-            <h4 className="text-xs font-medium text-zinc-600 mb-2">Price Duration Curve</h4>
+          </ExportableChart>
+          <ExportableChart
+            title="Price Duration Curve"
+            filename="eda_BE_hourly_price_duration_curve_exceedance"
+            edaRegister={{ key: "eda-dist-duration", order: 13 }}
+          >
             <ResponsiveContainer width="100%" height={250}>
               <LineChart data={data.priceDurationCurve}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -390,7 +474,7 @@ export default function EDAView() {
                 <Line dataKey="price" stroke={COLORS.primary} strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
-          </div>
+          </ExportableChart>
         </div>
       ))}
 
@@ -404,8 +488,11 @@ export default function EDAView() {
             <StatCard label="Most Affected Hour" value={(() => { const maxH = data.negativePrices.hourlyDistribution.reduce((a, b) => a.count > b.count ? a : b); return `${maxH.hour}:00 (${maxH.count})`; })()} />
           </div>
           {data.negativePrices.timeline.length > 0 && (
-            <div>
-              <h4 className="text-xs font-medium text-zinc-600 mb-2">Negative Prices Timeline</h4>
+            <ExportableChart
+              title="Negative Prices Timeline"
+              filename="eda_BE_hourly_negative_price_timeline_scatter"
+              edaRegister={{ key: "eda-neg-timeline", order: 20 }}
+            >
               <ResponsiveContainer width="100%" height={200}>
                 <ScatterChart margin={{ top: 10, right: 10, bottom: 30, left: 50 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -416,11 +503,14 @@ export default function EDAView() {
                   <Scatter data={data.negativePrices.timeline} fill={COLORS.secondary} fillOpacity={0.6} r={3} />
                 </ScatterChart>
               </ResponsiveContainer>
-            </div>
+            </ExportableChart>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h4 className="text-xs font-medium text-zinc-600 mb-2">Negative Prices by Month</h4>
+            <ExportableChart
+              title="Negative Prices by Month"
+              filename="eda_BE_hourly_negative_price_count_by_month"
+              edaRegister={{ key: "eda-neg-month", order: 21 }}
+            >
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={data.negativePrices.monthlyDistribution.filter(m => m.count > 0)}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -430,9 +520,12 @@ export default function EDAView() {
                   <Bar dataKey="count" fill={COLORS.secondary} fillOpacity={0.7} name="Count" radius={[2, 2, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
-            </div>
-            <div>
-              <h4 className="text-xs font-medium text-zinc-600 mb-2">Negative Prices by Hour of Day</h4>
+            </ExportableChart>
+            <ExportableChart
+              title="Negative Prices by Hour of Day"
+              filename="eda_BE_hourly_negative_price_count_by_hour"
+              edaRegister={{ key: "eda-neg-hour", order: 22 }}
+            >
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={data.negativePrices.hourlyDistribution}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -442,7 +535,7 @@ export default function EDAView() {
                   <Bar dataKey="count" fill={COLORS.orange} fillOpacity={0.7} name="Count" radius={[2, 2, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
-            </div>
+            </ExportableChart>
           </div>
         </div>
       ))}
@@ -450,8 +543,11 @@ export default function EDAView() {
       {/* ────── 6. Temporal Patterns ────── */}
       {S("temporal", "Temporal Patterns", "Hourly, daily, and monthly price patterns", (
         <div className="space-y-6">
-          <div>
-            <h4 className="text-xs font-medium text-zinc-600 mb-2">Average Price by Hour of Day</h4>
+          <ExportableChart
+            title="Average Price by Hour of Day (IQR band)"
+            filename="eda_BE_hourly_price_mean_median_by_hour_with_IQR_band"
+            edaRegister={{ key: "eda-temp-hour", order: 30 }}
+          >
             <p className="text-xs text-zinc-400 mb-2">The shaded band shows the interquartile range (IQR): 25th–75th percentile of prices at each hour.</p>
             <ResponsiveContainer width="100%" height={280}>
               <ComposedChart
@@ -471,10 +567,13 @@ export default function EDAView() {
                 <Legend wrapperStyle={{ fontSize: 11 }} />
               </ComposedChart>
             </ResponsiveContainer>
-          </div>
+          </ExportableChart>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h4 className="text-xs font-medium text-zinc-600 mb-2">Average Price by Day of Week</h4>
+            <ExportableChart
+              title="Average Price by Day of Week"
+              filename="eda_BE_hourly_price_mean_median_by_weekday"
+              edaRegister={{ key: "eda-temp-dow", order: 31 }}
+            >
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={data.temporalPatterns.daily}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -490,9 +589,12 @@ export default function EDAView() {
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                 </BarChart>
               </ResponsiveContainer>
-            </div>
-            <div>
-              <h4 className="text-xs font-medium text-zinc-600 mb-2">Average Price by Month</h4>
+            </ExportableChart>
+            <ExportableChart
+              title="Average Price by Month"
+              filename="eda_BE_hourly_price_mean_median_by_calendar_month"
+              edaRegister={{ key: "eda-temp-month", order: 32 }}
+            >
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={data.temporalPatterns.monthly}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -504,7 +606,7 @@ export default function EDAView() {
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                 </BarChart>
               </ResponsiveContainer>
-            </div>
+            </ExportableChart>
           </div>
           {/* Peak vs Off-Peak */}
           <div>
@@ -537,8 +639,11 @@ export default function EDAView() {
       {/* ────── 7. Price Heatmaps ────── */}
       {S("heatmaps", "Price Heatmaps", "Average price by hour/day and hour/month", (
         <div className="space-y-8">
-          <div>
-            <h4 className="text-xs font-medium text-zinc-600 mb-3">Average Price: Hour of Day vs Day of Week</h4>
+          <ExportableChart
+            title="Average Price: Hour of Day vs Day of Week"
+            filename="eda_BE_hourly_price_heatmap_hour_vs_weekday_EUR_per_MWh"
+            edaRegister={{ key: "eda-heat-week", order: 40 }}
+          >
             <HeatmapGrid
               data={data.heatmaps.weekly}
               rowKey="hour"
@@ -548,9 +653,12 @@ export default function EDAView() {
               rows={24}
               cols={7}
             />
-          </div>
-          <div>
-            <h4 className="text-xs font-medium text-zinc-600 mb-3">Average Price: Hour of Day vs Month</h4>
+          </ExportableChart>
+          <ExportableChart
+            title="Average Price: Hour of Day vs Month"
+            filename="eda_BE_hourly_price_heatmap_hour_vs_month_EUR_per_MWh"
+            edaRegister={{ key: "eda-heat-month", order: 41 }}
+          >
             <HeatmapGrid
               data={data.heatmaps.monthly}
               rowKey="hour"
@@ -561,7 +669,7 @@ export default function EDAView() {
               cols={12}
               colOffset={1}
             />
-          </div>
+          </ExportableChart>
         </div>
       ))}
 
@@ -588,8 +696,11 @@ export default function EDAView() {
               </div>
             </div>
           </div>
-          <div>
-            <h4 className="text-xs font-medium text-zinc-600 mb-2">Price Distribution (Normalized)</h4>
+          <ExportableChart
+            title="Price Distribution (Normalized): Weekday vs Weekend"
+            filename="eda_BE_hourly_price_weekday_vs_weekend_normalized_histogram"
+            edaRegister={{ key: "eda-ww-hist", order: 50 }}
+          >
             <p className="text-xs text-zinc-400 mb-2">
               Proportion of observations in each price bin (2nd–98th percentile range). Normalized so weekday and weekend are directly comparable.
             </p>
@@ -611,9 +722,12 @@ export default function EDAView() {
                 <Legend wrapperStyle={{ fontSize: 11 }} />
               </ComposedChart>
             </ResponsiveContainer>
-          </div>
-          <div>
-            <h4 className="text-xs font-medium text-zinc-600 mb-2">Mean Price by Hour: Weekday vs Weekend</h4>
+          </ExportableChart>
+          <ExportableChart
+            title="Mean Price by Hour: Weekday vs Weekend"
+            filename="eda_BE_hourly_price_mean_by_hour_weekday_vs_weekend"
+            edaRegister={{ key: "eda-ww-hour", order: 51 }}
+          >
             <p className="text-xs text-zinc-400 mb-2">
               Average price at each hour of the day. Weekends typically show lower peaks and less volatility.
             </p>
@@ -634,19 +748,25 @@ export default function EDAView() {
                 <Legend wrapperStyle={{ fontSize: 11 }} />
               </LineChart>
             </ResponsiveContainer>
-          </div>
+          </ExportableChart>
         </div>
       ))}
 
       {/* ────── 9. Correlation Analysis ────── */}
       {S("correlation", "Correlation Analysis", "Pearson correlations between key features", (
         <div className="space-y-6">
-          <div>
-            <h4 className="text-xs font-medium text-zinc-600 mb-3">Correlation Matrix</h4>
+          <ExportableChart
+            title="Correlation Matrix (Pearson)"
+            filename="eda_BE_hourly_features_pearson_correlation_matrix"
+            edaRegister={{ key: "eda-corr-matrix", order: 60 }}
+          >
             <CorrelationMatrix features={data.correlations.features} matrix={data.correlations.matrix} />
-          </div>
-          <div>
-            <h4 className="text-xs font-medium text-zinc-600 mb-2">Correlation with Prices (sorted by |r|)</h4>
+          </ExportableChart>
+          <ExportableChart
+            title="Correlation with Prices (sorted by absolute r)"
+            filename="eda_BE_hourly_features_correlation_with_BE_price_bars"
+            edaRegister={{ key: "eda-corr-price-bars", order: 61 }}
+          >
             <ResponsiveContainer width="100%" height={Math.max(250, data.correlations.withPrices.length * 22)}>
               <BarChart data={data.correlations.withPrices} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -661,12 +781,12 @@ export default function EDAView() {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
-          </div>
+          </ExportableChart>
           <div>
             <h4 className="text-xs font-medium text-zinc-600 mb-2">Scatter Plots vs Prices (top 4 correlated)</h4>
             <p className="text-xs text-zinc-400 mb-2">Axes use 2nd–98th percentile range to reduce outlier impact. Dashed line = linear regression trend.</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {data.correlations.scatterVsPrices.map(({ feature, points }) => {
+              {data.correlations.scatterVsPrices.map(({ feature, points }, scatterIdx) => {
                 const xs = points.map((p) => p.x).filter((v) => !Number.isNaN(v));
                 const ys = points.map((p) => p.y).filter((v) => !Number.isNaN(v));
                 const xSorted = [...xs].sort((a, b) => a - b);
@@ -678,9 +798,15 @@ export default function EDAView() {
                 const { slope, intercept } = linearRegression(points);
                 const trendY1 = slope * xMin + intercept;
                 const trendY2 = slope * xMax + intercept;
+                const featSlug = feature.replace(/[^a-z0-9]+/gi, "_").replace(/^_|_$/g, "").toLowerCase() || "feature";
                 return (
-                  <div key={feature}>
-                    <p className="text-xs text-zinc-500 mb-1">{feature} vs Prices (r = {data.correlations.withPrices.find((f) => f.feature === feature)?.correlation})</p>
+                  <ExportableChart
+                    key={feature}
+                    title={`${feature} vs BE Prices (scatter)`}
+                    filename={`eda_BE_hourly_scatter_${featSlug}_vs_price_top_corr_${scatterIdx + 1}`}
+                    edaRegister={{ key: `eda-corr-scatter-${featSlug}`, order: 150 + scatterIdx }}
+                  >
+                    <p className="text-xs text-zinc-500 mb-1">r = {data.correlations.withPrices.find((f) => f.feature === feature)?.correlation}</p>
                     <ResponsiveContainer width="100%" height={220}>
                       <ScatterChart margin={{ top: 10, right: 10, bottom: 30, left: 50 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -699,7 +825,7 @@ export default function EDAView() {
                         />
                       </ScatterChart>
                     </ResponsiveContainer>
-                  </div>
+                  </ExportableChart>
                 );
               })}
             </div>
@@ -710,8 +836,11 @@ export default function EDAView() {
       {/* ────── 10. Cross-border Prices ────── */}
       {S("crossborder", "Cross-border Price Comparison", "BE vs FR vs NL daily prices and spreads", (
         <div className="space-y-6">
-          <div>
-            <h4 className="text-xs font-medium text-zinc-600 mb-2">Daily Average Prices: Belgium, France, Netherlands</h4>
+          <ExportableChart
+            title="Daily Average Prices: Belgium, France, Netherlands"
+            filename="eda_BE_FR_NL_daily_average_day_ahead_price_EUR_per_MWh"
+            edaRegister={{ key: "eda-xb-daily", order: 170 }}
+          >
             <ZoomableTimeSeriesChart data={data.crossBorder.daily} xDataKey="date" height={300} formatXLabel={(v) => v.slice(5)} chartType="LineChart">
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={(v: string) => v.slice(5)} interval={Math.floor(data.crossBorder.daily.length / 10)} />
@@ -722,9 +851,12 @@ export default function EDAView() {
               <Line dataKey="NL" stroke={COLORS.tertiary} strokeWidth={1} dot={false} opacity={0.7} name="Netherlands" />
               <Legend wrapperStyle={{ fontSize: 11 }} />
             </ZoomableTimeSeriesChart>
-          </div>
-          <div>
-            <h4 className="text-xs font-medium text-zinc-600 mb-2">Price Spreads (BE minus neighbor)</h4>
+          </ExportableChart>
+          <ExportableChart
+            title="Price Spreads (BE minus neighbor)"
+            filename="eda_BE_minus_FR_and_BE_minus_NL_daily_price_spread_EUR_per_MWh"
+            edaRegister={{ key: "eda-xb-spreads", order: 171 }}
+          >
             <ZoomableTimeSeriesChart data={data.crossBorder.spreads} xDataKey="date" height={250} formatXLabel={(v) => v.slice(5)}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={(v: string) => v.slice(5)} interval={Math.floor(data.crossBorder.spreads.length / 10)} />
@@ -735,7 +867,7 @@ export default function EDAView() {
               <Line dataKey="BE_NL" stroke={COLORS.tertiary} strokeWidth={1} dot={false} name="BE - NL" opacity={0.7} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
             </ZoomableTimeSeriesChart>
-          </div>
+          </ExportableChart>
           <div>
             <h4 className="text-xs font-medium text-zinc-600 mb-2">Spread Statistics</h4>
             <table className="w-full text-xs">
@@ -768,8 +900,11 @@ export default function EDAView() {
       {S("load", "Load Analysis", "Forecast vs actual and imbalance distribution", (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h4 className="text-xs font-medium text-zinc-600 mb-2">Load Forecast vs Actual (sampled)</h4>
+            <ExportableChart
+              title="Load Forecast vs Actual (sampled)"
+              filename="eda_BE_load_forecast_vs_actual_scatter_MW"
+              edaRegister={{ key: "eda-load-fa-scatter", order: 180 }}
+            >
               <ResponsiveContainer width="100%" height={300}>
                 <ScatterChart>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -809,9 +944,12 @@ export default function EDAView() {
                   })()}
                 </ScatterChart>
               </ResponsiveContainer>
-            </div>
-            <div>
-              <h4 className="text-xs font-medium text-zinc-600 mb-2">Load Imbalance Distribution (Actual - Forecast)</h4>
+            </ExportableChart>
+            <ExportableChart
+              title="Load Imbalance Distribution (Actual − Forecast)"
+              filename="eda_BE_load_imbalance_actual_minus_forecast_histogram_MW"
+              edaRegister={{ key: "eda-load-imbalance-hist", order: 181 }}
+            >
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={data.loadAnalysis.imbalanceHist}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -821,7 +959,7 @@ export default function EDAView() {
                   <Bar dataKey="count" fill={COLORS.purple} fillOpacity={0.6} name="Count" radius={[1, 1, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
-            </div>
+            </ExportableChart>
           </div>
           <div className="bg-zinc-50 rounded-lg p-3 border border-zinc-100">
             <h4 className="text-xs font-semibold text-zinc-600 mb-2">Imbalance Statistics</h4>
@@ -856,8 +994,11 @@ export default function EDAView() {
 
       {/* ────── 12. Renewable Energy Forecasts ────── */}
       {S("renewables", "Renewable Energy Forecasts", "Weekly average wind and solar", (
-        <div>
-          <h4 className="text-xs font-medium text-zinc-600 mb-2">Weekly Average Renewable Forecasts (Belgium)</h4>
+        <ExportableChart
+          title="Weekly Average Renewable Forecasts (Belgium)"
+          filename="eda_BE_weekly_average_wind_and_solar_forecast_MW"
+          edaRegister={{ key: "eda-renew-weekly", order: 182 }}
+        >
           <ZoomableTimeSeriesChart data={data.renewables.weekly} xDataKey="week" height={300}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis dataKey="week" tick={{ fontSize: 9 }} interval={Math.floor(data.renewables.weekly.length / 12)} angle={-45} textAnchor="end" height={50} />
@@ -867,13 +1008,16 @@ export default function EDAView() {
             <Line dataKey="wind" stroke={COLORS.cyan} strokeWidth={2} dot={false} name="Wind" />
             <Legend wrapperStyle={{ fontSize: 11 }} />
           </ZoomableTimeSeriesChart>
-        </div>
+        </ExportableChart>
       ))}
 
       {/* ────── 13. Cross-border Flows ────── */}
       {S("flows", "Cross-border Flows", "Weekly average flows BE-NL, BE-FR, BE-DE", (
-        <div>
-          <h4 className="text-xs font-medium text-zinc-600 mb-2">Weekly Average Cross-border Flows</h4>
+        <ExportableChart
+          title="Weekly Average Cross-border Flows"
+          filename="eda_BE_weekly_average_cross_border_flows_BE_NL_BE_FR_BE_DE_MW"
+          edaRegister={{ key: "eda-flows-weekly", order: 183 }}
+        >
           <ZoomableTimeSeriesChart data={data.crossBorderFlows.weekly} xDataKey="week" height={300} chartType="LineChart">
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis dataKey="week" tick={{ fontSize: 9 }} interval={Math.floor(data.crossBorderFlows.weekly.length / 12)} angle={-45} textAnchor="end" height={50} />
@@ -885,14 +1029,17 @@ export default function EDAView() {
             <Line dataKey="BE_DE" stroke={COLORS.tertiary} strokeWidth={1.5} dot={false} name="BE-DE" />
             <Legend wrapperStyle={{ fontSize: 11 }} />
           </ZoomableTimeSeriesChart>
-        </div>
+        </ExportableChart>
       ))}
 
       {/* ────── 14. Autocorrelation & Stationarity ────── */}
       {S("acf", "Autocorrelation & Stationarity", "ACF up to 168 lags (1 week) and price changes", (
         <div className="space-y-6">
-          <div>
-            <h4 className="text-xs font-medium text-zinc-600 mb-2">Autocorrelation Function (Prices)</h4>
+          <ExportableChart
+            title="Autocorrelation Function (Prices)"
+            filename="eda_BE_hourly_price_ACF_up_to_168_lags_with_CI"
+            edaRegister={{ key: "eda-acf-bars", order: 184 }}
+          >
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={data.autocorrelation.acf.slice(1)}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -910,10 +1057,13 @@ export default function EDAView() {
               </BarChart>
             </ResponsiveContainer>
             <p className="text-xs text-zinc-400 mt-1">Red bars highlight lags 24h, 48h, 168h (weekly). Red dashed lines = 95% confidence interval.</p>
-          </div>
+          </ExportableChart>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h4 className="text-xs font-medium text-zinc-600 mb-2">Hourly Price Changes Distribution</h4>
+            <ExportableChart
+              title="Hourly Price Changes Distribution"
+              filename="eda_BE_hourly_price_first_difference_histogram_EUR_per_MWh"
+              edaRegister={{ key: "eda-acf-dpchist", order: 185 }}
+            >
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={data.autocorrelation.priceChangesHist}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -924,7 +1074,7 @@ export default function EDAView() {
                   <Bar dataKey="count" fill={COLORS.cyan} fillOpacity={0.6} name="Count" radius={[1, 1, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
-            </div>
+            </ExportableChart>
             <div className="flex flex-col justify-center">
               <h4 className="text-xs font-medium text-zinc-600 mb-3">Price Change Statistics</h4>
               <div className="space-y-2 text-xs">
@@ -941,22 +1091,30 @@ export default function EDAView() {
       {/* ────── 15. Feature Distributions ────── */}
       {S("features", "Feature Distributions", `Histograms for ${data.featureDistributions.length} key features`, (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {data.featureDistributions.map(({ feature, histogram: hist, mean: m, std: s }) => (
-            <div key={feature} className="border border-zinc-100 rounded-lg p-2">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-medium text-zinc-700 truncate">{feature}</span>
-                <span className="text-[10px] text-zinc-400 ml-1 shrink-0">m={m} s={s}</span>
-              </div>
-              <ResponsiveContainer width="100%" height={120}>
-                <BarChart data={hist} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
-                  <XAxis dataKey="binStart" tick={false} />
-                  <YAxis tick={false} width={0} />
-                  <Tooltip contentStyle={{ fontSize: 10 }} formatter={(v) => [v, "Count"]} labelFormatter={(v) => `${Number(v).toFixed(1)}`} />
-                  <Bar dataKey="count" fill={COLORS.primary} fillOpacity={0.5} radius={[1, 1, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ))}
+          {data.featureDistributions.map(({ feature, histogram: hist, mean: m, std: s }, fi) => {
+            const fslug = feature.replace(/[^a-z0-9]+/gi, "_").replace(/^_|_$/g, "").toLowerCase() || "feature";
+            return (
+              <ExportableChart
+                key={feature}
+                title={`${feature} (histogram)`}
+                filename={`eda_BE_hourly_feature_histogram_${fslug}_mean_${m}_std_${s}`}
+                edaRegister={{ key: `eda-feat-${fslug}`, order: 300 + fi }}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-medium text-zinc-700 truncate">{feature}</span>
+                  <span className="text-[10px] text-zinc-400 ml-1 shrink-0">m={m} s={s}</span>
+                </div>
+                <ResponsiveContainer width="100%" height={120}>
+                  <BarChart data={hist} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
+                    <XAxis dataKey="binStart" tick={false} />
+                    <YAxis tick={false} width={0} />
+                    <Tooltip contentStyle={{ fontSize: 10 }} formatter={(v) => [v, "Count"]} labelFormatter={(v) => `${Number(v).toFixed(1)}`} />
+                    <Bar dataKey="count" fill={COLORS.primary} fillOpacity={0.5} radius={[1, 1, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ExportableChart>
+            );
+          })}
         </div>
       ))}
 
@@ -964,6 +1122,11 @@ export default function EDAView() {
       {S("outliers", "Outlier Analysis", "Standardized box plots for all features", (
         <div className="space-y-4">
           <p className="text-xs text-zinc-500">Features standardized to zero mean and unit variance. Outliers defined as values beyond 1.5x IQR from Q1/Q3.</p>
+          <ExportableChart
+            title="Outlier Analysis Table (standardized features)"
+            filename="eda_BE_hourly_features_outlier_summary_table_with_mini_boxplots"
+            edaRegister={{ key: "eda-outliers-table", order: 900 }}
+          >
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
@@ -998,12 +1161,17 @@ export default function EDAView() {
               </tbody>
             </table>
           </div>
+          </ExportableChart>
         </div>
       ))}
 
       {/* ────── 17. Pair Plot ────── */}
       {S("pairplot", "Pair Plot (Key Features)", `Scatter matrix for ${data.pairPlot.features.length} features`, (
-        <div>
+        <ExportableChart
+          title={`Pair plot (key features, ${data.pairPlot.features.length}×${data.pairPlot.features.length})`}
+          filename="eda_BE_hourly_key_features_pair_plot_scatter_matrix_sampled"
+          edaRegister={{ key: "eda-pairplot", order: 910 }}
+        >
           <p className="text-xs text-zinc-500 mb-3">Scatter plots between key features (300 sampled points, 2nd–98th percentile domain to reduce outlier impact)</p>
           <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${data.pairPlot.features.length}, 1fr)` }}>
             {data.pairPlot.features.flatMap((fy, yi) =>
@@ -1056,14 +1224,17 @@ export default function EDAView() {
               <span key={f} className="text-[10px] px-2 py-0.5 bg-zinc-100 rounded text-zinc-600">{f}</span>
             ))}
           </div>
-        </div>
+        </ExportableChart>
       ))}
 
       {/* ────── 18. Volatility Analysis ────── */}
       {S("volatility", "Volatility Analysis", "14-day rolling volatility and monthly patterns", (
         <div className="space-y-6">
-          <div>
-            <h4 className="text-xs font-medium text-zinc-600 mb-2">14-Day Rolling Volatility (Std Dev of Daily Returns)</h4>
+          <ExportableChart
+            title="14-Day Rolling Volatility (std dev of daily returns) vs price"
+            filename="eda_BE_hourly_price_14d_rolling_volatility_and_daily_average_price"
+            edaRegister={{ key: "eda-vol-daily", order: 920 }}
+          >
             <ZoomableTimeSeriesChart data={data.volatility.daily} xDataKey="date" height={280} formatXLabel={(v) => v.slice(5)}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={(v: string) => v.slice(5)} interval={Math.floor(data.volatility.daily.length / 10)} />
@@ -1074,9 +1245,12 @@ export default function EDAView() {
               <Area yAxisId="vol" dataKey="volatility" fill={COLORS.secondary} fillOpacity={0.15} stroke={COLORS.secondary} strokeWidth={1.5} name="Volatility" />
               <Legend wrapperStyle={{ fontSize: 11 }} />
             </ZoomableTimeSeriesChart>
-          </div>
-          <div>
-            <h4 className="text-xs font-medium text-zinc-600 mb-2">Monthly Volatility</h4>
+          </ExportableChart>
+          <ExportableChart
+            title="Monthly Volatility"
+            filename="eda_BE_hourly_price_monthly_volatility_std_of_daily_returns"
+            edaRegister={{ key: "eda-vol-monthly", order: 921 }}
+          >
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={data.volatility.monthly}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -1086,14 +1260,17 @@ export default function EDAView() {
                 <Bar dataKey="volatility" fill={COLORS.secondary} fillOpacity={0.6} name="Volatility (Std)" radius={[2, 2, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          </div>
+          </ExportableChart>
         </div>
       ))}
 
       {/* ────── 19. Year-over-Year ────── */}
       {S("yoy", "Year-over-Year Comparison", `${data.yearOverYear.years.filter((y) => y !== 2026).join(", ")}`, (
-        <div>
-          <h4 className="text-xs font-medium text-zinc-600 mb-2">Monthly Average Prices by Year</h4>
+        <ExportableChart
+          title="Monthly Average Prices by Year"
+          filename="eda_BE_hourly_price_monthly_average_by_year_grouped_bars_EUR_per_MWh"
+          edaRegister={{ key: "eda-yoy-monthly", order: 930 }}
+        >
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={data.yearOverYear.monthlyByYear}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -1108,7 +1285,7 @@ export default function EDAView() {
               <Legend wrapperStyle={{ fontSize: 11 }} />
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        </ExportableChart>
       ))}
 
     </div>
@@ -1116,12 +1293,6 @@ export default function EDAView() {
 }
 
 // ──────────────────── Sub-components ────────────────────
-
-const ALL_SECTIONS = [
-  "overview", "summary", "timeseries", "distribution", "negative", "temporal",
-  "heatmaps", "weekday", "correlation", "crossborder", "load", "renewables",
-  "flows", "acf", "features", "outliers", "pairplot", "volatility", "yoy",
-];
 
 function fmt(v: number): string {
   if (Math.abs(v) >= 1000) return v.toFixed(1);

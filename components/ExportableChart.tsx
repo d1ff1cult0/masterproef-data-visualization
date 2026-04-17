@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import { toPng } from "html-to-image";
 import ExportSettingsModal from "./ExportSettingsModal";
+import { useEdaChartExportRegistry } from "@/lib/eda-chart-export-context";
 
 export interface ExportSettings {
   includeTitle: boolean;
@@ -28,6 +29,8 @@ interface ExportableChartProps {
   titleClassName?: string;
   /** Optional: elements with this class are always excluded from export (e.g. buttons) */
   excludeClassName?: string;
+  /** Register for EDA page “Export all PNG” (unique key, sort order) */
+  edaRegister?: { key: string; order: number };
 }
 
 export function ExportableChart({
@@ -36,10 +39,13 @@ export function ExportableChart({
   children,
   titleClassName = "chart-export-title",
   excludeClassName = "chart-export-exclude",
+  edaRegister,
 }: ExportableChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [showModal, setShowModal] = useState(false);
   const [settings, setSettings] = useState<ExportSettings>(DEFAULT_SETTINGS);
+  const edaRegistry = useEdaChartExportRegistry();
+  const exportFnRef = useRef<(s: ExportSettings) => Promise<void>>(async () => {});
 
   const handleExport = useCallback(
     async (exportSettings: ExportSettings) => {
@@ -83,6 +89,15 @@ export function ExportableChart({
     },
     [titleClassName, excludeClassName, filename]
   );
+
+  exportFnRef.current = handleExport;
+
+  useEffect(() => {
+    if (!edaRegister || !edaRegistry) return;
+    const run = (s: ExportSettings) => exportFnRef.current(s);
+    edaRegistry.registerChart(edaRegister.key, edaRegister.order, run);
+    return () => edaRegistry.unregisterChart(edaRegister.key);
+  }, [edaRegistry, edaRegister?.key, edaRegister?.order]);
 
   return (
     <div className="relative">
