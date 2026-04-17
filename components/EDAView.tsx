@@ -224,6 +224,7 @@ function EDAViewContent({ data }: { data: EDAResult }) {
         modalTitle="Export all charts as PNG"
         modalDescription="All sections will be expanded first. Each figure downloads as its own file with a descriptive name (same options apply to every chart)."
         submitButtonLabel="Export all PNG"
+        includeTitleOption
       />
       {/* Header */}
       <div className="flex items-center justify-between mb-2">

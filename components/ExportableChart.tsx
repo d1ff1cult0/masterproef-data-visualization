@@ -99,6 +99,8 @@ export function ExportableChart({
     return () => edaRegistry.unregisterChart(edaRegister.key);
   }, [edaRegistry, edaRegister?.key, edaRegister?.order]);
 
+  const hasExportTitle = Boolean(title);
+
   return (
     <div className="relative">
       <div
@@ -106,11 +108,11 @@ export function ExportableChart({
         className="exportable-chart-container"
         style={{ position: "relative" }}
       >
-        <div className="absolute top-2 right-2 z-10">
+        <div className={`${excludeClassName} flex justify-end mb-1`}>
           <button
             type="button"
             onClick={() => setShowModal(true)}
-            className={`${excludeClassName} flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-zinc-600 bg-white/90 hover:bg-white border border-zinc-200 rounded-md shadow-sm transition-colors`}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-zinc-600 bg-white/90 hover:bg-white border border-zinc-200 rounded-md shadow-sm transition-colors"
             title="Export chart as PNG"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -120,7 +122,9 @@ export function ExportableChart({
           </button>
         </div>
         {title && (
-          <div className={`${titleClassName} text-sm font-semibold text-zinc-700 mb-2`}>
+          <div
+            className={`${titleClassName} text-sm font-semibold text-zinc-700 mb-2 w-full text-center px-1 leading-snug`}
+          >
             {title}
           </div>
         )}
@@ -134,6 +138,7 @@ export function ExportableChart({
           setShowModal(false);
         }}
         defaultSettings={settings}
+        includeTitleOption={hasExportTitle}
       />
     </div>
   );

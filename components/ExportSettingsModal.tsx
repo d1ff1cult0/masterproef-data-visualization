@@ -10,6 +10,8 @@ interface ExportSettingsModalProps {
   modalTitle?: string;
   modalDescription?: string;
   submitButtonLabel?: string;
+  /** When false, the chart has no title and “Include title” is hidden; exports omit a title row. */
+  includeTitleOption?: boolean;
 }
 
 const DPI_OPTIONS = [
@@ -26,6 +28,7 @@ export default function ExportSettingsModal({
   modalTitle = "Export chart as PNG",
   modalDescription = "Configure export options for papers and presentations.",
   submitButtonLabel = "Export PNG",
+  includeTitleOption = true,
 }: ExportSettingsModalProps) {
   if (!isOpen) return null;
 
@@ -33,7 +36,9 @@ export default function ExportSettingsModal({
     e.preventDefault();
     const form = e.currentTarget;
     const settings: ExportSettings = {
-      includeTitle: (form.elements.namedItem("includeTitle") as HTMLInputElement)?.checked ?? true,
+      includeTitle: includeTitleOption
+        ? ((form.elements.namedItem("includeTitle") as HTMLInputElement)?.checked ?? true)
+        : false,
       fontSize: Number((form.elements.namedItem("fontSize") as HTMLInputElement)?.value) || 12,
       boldLabels: (form.elements.namedItem("boldLabels") as HTMLInputElement)?.checked ?? true,
       dpi: Number((form.elements.namedItem("dpi") as HTMLSelectElement)?.value) || 300,
@@ -57,18 +62,20 @@ export default function ExportSettingsModal({
           {modalDescription}
         </p>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="flex items-center justify-between">
-            <label htmlFor="includeTitle" className="text-sm text-zinc-700">
-              Include title in export
-            </label>
-            <input
-              id="includeTitle"
-              name="includeTitle"
-              type="checkbox"
-              defaultChecked={defaultSettings.includeTitle}
-              className="rounded border-zinc-300 text-blue-600 focus:ring-blue-500"
-            />
-          </div>
+          {includeTitleOption && (
+            <div className="flex items-center justify-between">
+              <label htmlFor="includeTitle" className="text-sm text-zinc-700">
+                Include title in export
+              </label>
+              <input
+                id="includeTitle"
+                name="includeTitle"
+                type="checkbox"
+                defaultChecked={defaultSettings.includeTitle}
+                className="rounded border-zinc-300 text-blue-600 focus:ring-blue-500"
+              />
+            </div>
+          )}
           <div>
             <label htmlFor="fontSize" className="block text-sm text-zinc-700 mb-1">
               Font size (axis labels, legend, title)
