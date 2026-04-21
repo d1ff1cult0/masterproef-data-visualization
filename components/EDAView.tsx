@@ -202,7 +202,9 @@ function EDAViewContent({ data }: { data: EDAResult }) {
       await new Promise((r) => requestAnimationFrame(r));
       await new Promise((r) => requestAnimationFrame(r));
       await new Promise((r) => setTimeout(r, 600));
-      await edaRegistry?.exportAllCharts(settings);
+      const dateStamp = new Date().toISOString().slice(0, 10);
+      const zipName = `eda_BE_hourly_price_dashboard_figures_${dateStamp}.zip`;
+      await edaRegistry?.exportAllAsZip(settings, zipName);
       setBulkExportOpen(false);
     },
     [edaRegistry, expandAll]
@@ -221,9 +223,9 @@ function EDAViewContent({ data }: { data: EDAResult }) {
         onClose={() => setBulkExportOpen(false)}
         onExport={runBulkExport}
         defaultSettings={bulkExportSettings}
-        modalTitle="Export all charts as PNG"
-        modalDescription="All sections will be expanded first. Each figure downloads as its own file with a descriptive name (same options apply to every chart)."
-        submitButtonLabel="Export all PNG"
+        modalTitle="Export all charts (ZIP)"
+        modalDescription="All sections will be expanded first, then one ZIP file downloads containing every figure as a PNG with a descriptive filename. Export options apply to each image."
+        submitButtonLabel="Download ZIP"
         includeTitleOption
       />
       {/* Header */}
@@ -238,7 +240,7 @@ function EDAViewContent({ data }: { data: EDAResult }) {
             onClick={() => setBulkExportOpen(true)}
             className="text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-md shadow-sm transition-colors"
           >
-            Export all PNG
+            Export all (ZIP)
           </button>
           <button onClick={expandAll} className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50 transition-colors">Expand All</button>
           <button onClick={collapseAll} className="text-xs text-zinc-500 hover:text-zinc-700 px-2 py-1 rounded hover:bg-zinc-100 transition-colors">Collapse All</button>

@@ -45,16 +45,15 @@ export function ExportableChart({
   const [showModal, setShowModal] = useState(false);
   const [settings, setSettings] = useState<ExportSettings>(DEFAULT_SETTINGS);
   const edaRegistry = useEdaChartExportRegistry();
-  const exportFnRef = useRef<(s: ExportSettings) => Promise<void>>(async () => {});
+  const captureToBlobRef = useRef<(s: ExportSettings) => Promise<Blob | null>>(
+    async () => null
+  );
 
-  const handleExport = useCallback(
-    async (exportSettings: ExportSettings) => {
+  const captureToBlob = useCallback(
+    async (exportSettings: ExportSettings): Promise<Blob | null> => {
       const node = containerRef.current;
-      if (!node) return;
+      if (!node) return null;
 
-      setSettings(exportSettings);
-
-      // pixelRatio: 72 DPI is default, so 300/72 ≈ 4.17 for print quality
       const pixelRatio = exportSettings.dpi / 72;
 
       const filter = (el: HTMLElement) => {
@@ -64,7 +63,6 @@ export function ExportableChart({
         return true;
       };
 
-      // Apply font size and weight to root so they inherit to chart text elements
       const style = {
         fontSize: `${exportSettings.fontSize}px`,
         fontWeight: exportSettings.boldLabels ? "600" : "400",
@@ -78,26 +76,48 @@ export function ExportableChart({
           cacheBust: true,
           style,
         });
-
-        const link = document.createElement("a");
-        link.download = `${filename.replace(/[^a-z0-9-_]/gi, "_")}.png`;
-        link.href = dataUrl;
-        link.click();
+        const res = await fetch(dataUrl);
+        return await res.blob();
       } catch (err) {
         console.error("Export failed:", err);
+        return null;
       }
     },
-    [titleClassName, excludeClassName, filename]
+    [titleClassName, excludeClassName]
   );
 
-  exportFnRef.current = handleExport;
+  captureToBlobRef.current = captureToBlob;
+
+  const handleExport = useCallback(
+    async (exportSettings: ExportSettings) => {
+      setSettings(exportSettings);
+      const blob = await captureToBlobRef.current(exportSettings);
+      if (!blob) return;
+      const safeName = `${filename.replace(/[^a-z0-9-_]/gi, "_")}.png`;
+      const url = URL.createObjectURL(blob);
+      try {
+        const link = document.createElement("a");
+        link.download = safeName;
+        link.href = url;
+        link.click();
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    },
+    [filename]
+  );
 
   useEffect(() => {
     if (!edaRegister || !edaRegistry) return;
-    const run = (s: ExportSettings) => exportFnRef.current(s);
-    edaRegistry.registerChart(edaRegister.key, edaRegister.order, run);
+    const fileBase = filename.replace(/[^a-z0-9-_]/gi, "_") || "chart";
+    edaRegistry.registerChart(
+      edaRegister.key,
+      edaRegister.order,
+      fileBase,
+      (s) => captureToBlobRef.current(s)
+    );
     return () => edaRegistry.unregisterChart(edaRegister.key);
-  }, [edaRegistry, edaRegister?.key, edaRegister?.order]);
+  }, [edaRegistry, edaRegister?.key, edaRegister?.order, filename]);
 
   const hasExportTitle = Boolean(title);
 
