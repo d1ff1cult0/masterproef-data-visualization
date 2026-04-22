@@ -7,11 +7,16 @@ import { MODEL_COLORS, EXPERIMENT_NOTEBOOK_MAP } from "@/lib/types";
 interface SidebarProps {
   selectedModels: SelectedModel[];
   onSelectionChange: (models: SelectedModel[]) => void;
+  /** Shown in the panel header (e.g. close drawer on mobile) */
+  onClose?: () => void;
+  className?: string;
 }
 
 export default function Sidebar({
   selectedModels,
   onSelectionChange,
+  onClose,
+  className,
 }: SidebarProps) {
   const [experiments, setExperiments] = useState<Experiment[]>([]);
   const [expandedExp, setExpandedExp] = useState<string | null>(null);
@@ -69,11 +74,28 @@ export default function Sidebar({
     name.replace(/_/g, " ").replace(/\(([^)]+)\)/g, "($1)");
 
   return (
-    <aside className="w-72 shrink-0 border-r border-zinc-200 bg-white flex flex-col overflow-hidden">
-      <div className="px-4 py-3 border-b border-zinc-100">
-        <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+    <aside
+      className={`w-72 max-w-[min(18rem,90vw)] shrink-0 border-r border-zinc-200 bg-white flex flex-col overflow-hidden h-full min-h-0 lg:max-w-none ${className ?? ""}`}
+    >
+      <div className="px-4 py-3 border-b border-zinc-100 flex items-center justify-between gap-2 min-h-11">
+        <h2
+          id={onClose ? "experiments-panel-title" : undefined}
+          className="text-xs font-semibold text-zinc-500 uppercase tracking-wider"
+        >
           Experiments
         </h2>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="lg:hidden rounded-md p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 transition-colors"
+            aria-label="Close experiments panel"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto p-2 space-y-0.5">

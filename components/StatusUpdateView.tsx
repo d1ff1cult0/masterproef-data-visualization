@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import type { StatusUpdateSection } from "@/lib/status-updates";
 import { STATUS_UPDATES } from "@/lib/status-updates";
 
@@ -154,67 +154,179 @@ function SectionRenderer({ section }: { section: StatusUpdateSection }) {
   }
 }
 
+function StatusUpdateList({
+  selectedUpdateId,
+  onSelectUpdate,
+  onPick,
+  showClose,
+  onClose,
+}: StatusUpdateViewProps & {
+  onPick?: (id: string | null) => void;
+  showClose?: boolean;
+  onClose?: () => void;
+}) {
+  return (
+    <aside className="flex h-full min-h-0 w-72 max-w-[min(18rem,90vw)] shrink-0 flex-col overflow-hidden border-r border-zinc-200 bg-white lg:max-w-none">
+      <div className="flex min-h-11 items-center justify-between gap-2 border-b border-zinc-100 px-4 py-3">
+        <h2
+          id={showClose ? "status-updates-panel-title" : undefined}
+          className="text-xs font-semibold uppercase tracking-wider text-zinc-500"
+        >
+          Status Updates
+        </h2>
+        {showClose && onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-1.5 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 lg:hidden"
+            aria-label="Close status updates list"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
+      <div className="flex-1 space-y-0.5 overflow-y-auto p-2">
+        {STATUS_UPDATES.map((u) => (
+          <button
+            key={u.id}
+            type="button"
+            onClick={() => {
+              const next = selectedUpdateId === u.id ? null : u.id;
+              onSelectUpdate(next);
+              onPick?.(next);
+            }}
+            className={`w-full rounded-md px-3 py-2.5 text-left text-xs transition-colors ${
+              selectedUpdateId === u.id
+                ? "bg-blue-50 text-blue-700 ring-1 ring-blue-200"
+                : "text-zinc-600 hover:bg-zinc-50"
+            }`}
+          >
+            <span className="font-medium">Update {u.number}</span>
+            <span
+              className={`mt-0.5 block truncate ${selectedUpdateId === u.id ? "text-blue-500" : "text-zinc-400"}`}
+            >
+              {u.title}
+            </span>
+          </button>
+        ))}
+      </div>
+    </aside>
+  );
+}
+
 export default function StatusUpdateView({
   selectedUpdateId,
   onSelectUpdate,
 }: StatusUpdateViewProps) {
   const selectedUpdate = STATUS_UPDATES.find((u) => u.id === selectedUpdateId);
+  const [listOpen, setListOpen] = useState(false);
+
+  const closeList = useCallback(() => setListOpen(false), []);
+
+  useEffect(() => {
+    if (!listOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [listOpen]);
+
+  useEffect(() => {
+    if (!listOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeList();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [listOpen, closeList]);
 
   return (
-    <div className="flex flex-1 overflow-hidden">
-      <aside className="w-72 shrink-0 border-r border-zinc-200 bg-white flex flex-col overflow-hidden">
-        <div className="px-4 py-3 border-b border-zinc-100">
-          <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
-            Status Updates
-          </h2>
+    <div className="flex min-h-0 flex-1 overflow-hidden">
+      <div className="hidden h-full min-h-0 shrink-0 lg:flex">
+        <StatusUpdateList selectedUpdateId={selectedUpdateId} onSelectUpdate={onSelectUpdate} />
+      </div>
+
+      {listOpen && (
+        <div
+          className="fixed inset-0 z-50 flex lg:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="status-updates-panel-title"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 bg-zinc-900/40"
+            aria-label="Close status updates list"
+            onClick={closeList}
+          />
+          <div className="relative flex h-full min-h-0 max-w-[min(20rem,92vw)] shadow-xl">
+            <StatusUpdateList
+              selectedUpdateId={selectedUpdateId}
+              onSelectUpdate={onSelectUpdate}
+              onPick={() => closeList()}
+              showClose
+              onClose={closeList}
+            />
+          </div>
         </div>
-        <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
-          {STATUS_UPDATES.map((u) => (
-            <button
-              key={u.id}
-              onClick={() => onSelectUpdate(selectedUpdateId === u.id ? null : u.id)}
-              className={`w-full text-left px-3 py-2.5 rounded-md text-xs transition-colors ${
-                selectedUpdateId === u.id
-                  ? "bg-blue-50 text-blue-700 ring-1 ring-blue-200"
-                  : "text-zinc-600 hover:bg-zinc-50"
-              }`}
+      )}
+
+      <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-zinc-50/50">
+        <div className="z-10 flex shrink-0 items-center gap-2 border-b border-zinc-200 bg-white/95 px-3 py-2 backdrop-blur-sm lg:hidden">
+          <button
+            type="button"
+            onClick={() => setListOpen(true)}
+            className="inline-flex items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-800 shadow-sm hover:bg-zinc-50"
+          >
+            <svg
+              className="h-4 w-4 text-zinc-500"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+              aria-hidden="true"
             >
-              <span className="font-medium">Update {u.number}</span>
-              <span className={`block truncate mt-0.5 ${selectedUpdateId === u.id ? "text-blue-500" : "text-zinc-400"}`}>
-                {u.title}
-              </span>
-            </button>
-          ))}
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h7" />
+            </svg>
+            All updates
+          </button>
+          {selectedUpdate && (
+            <span className="min-w-0 flex-1 truncate text-xs text-zinc-500">
+              Update {selectedUpdate.number}: {selectedUpdate.title}
+            </span>
+          )}
         </div>
-      </aside>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {!selectedUpdate ? (
+            <div className="flex h-full min-h-[40vh] items-center justify-center px-4">
+              <p className="text-center text-sm text-zinc-400">
+                Select a status update to view, or open the list on your phone.
+              </p>
+            </div>
+          ) : (
+            <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8 lg:p-8">
+              <article>
+                <header className="mb-6 border-b border-zinc-200 pb-4 sm:mb-8 sm:pb-6">
+                  <h1 className="text-xl font-bold text-zinc-900 sm:text-2xl">
+                    Status Update {selectedUpdate.number}: {selectedUpdate.title}
+                  </h1>
+                  {selectedUpdate.date && (
+                    <p className="mt-1 text-sm text-zinc-500">{selectedUpdate.date}</p>
+                  )}
+                </header>
 
-      <main className="flex-1 overflow-y-auto bg-zinc-50/50">
-        {!selectedUpdate ? (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-sm text-zinc-400">
-              Select a status update to view
-            </p>
-          </div>
-        ) : (
-          <div className="p-8 max-w-4xl mx-auto">
-            <article>
-              <header className="mb-8 pb-6 border-b border-zinc-200">
-                <h1 className="text-2xl font-bold text-zinc-900">
-                  Status Update {selectedUpdate.number}: {selectedUpdate.title}
-                </h1>
-                {selectedUpdate.date && (
-                  <p className="text-sm text-zinc-500 mt-1">{selectedUpdate.date}</p>
-                )}
-              </header>
-
-              <div className="space-y-0">
-                {selectedUpdate.content.map((section, i) => (
-                  <SectionRenderer key={i} section={section} />
-                ))}
-              </div>
-            </article>
-          </div>
-        )}
+                <div className="space-y-0">
+                  {selectedUpdate.content.map((section, i) => (
+                    <SectionRenderer key={i} section={section} />
+                  ))}
+                </div>
+              </article>
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );
