@@ -9,11 +9,19 @@ import StatusUpdateView from "./StatusUpdateView";
 import BestModelsLanding from "./BestModelsLanding";
 import EDAView from "./EDAView";
 import AnalysisView from "./AnalysisView";
+import CompareModelsContextBanner from "./CompareModelsContextBanner";
 import type { SelectedModel } from "@/lib/types";
 
 type Tab = "eda" | "metrics" | "predictions" | "analysis" | "status-updates";
 
-const TABS: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode }[] = [
+const TABS: {
+  id: Tab;
+  label: string;
+  shortLabel: string;
+  /** Shown as a tooltip when models are selected (clarifies compare tabs vs methodology). */
+  compareHint?: string;
+  icon: React.ReactNode;
+}[] = [
   {
     id: "eda",
     label: "Data Analysis",
@@ -28,6 +36,8 @@ const TABS: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode 
     id: "metrics",
     label: "Metrics",
     shortLabel: "Metrics",
+    compareHint:
+      "Summary tables and bar charts for your selected models. Same runs and test window as Predictions and Analysis.",
     icon: (
       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
@@ -38,6 +48,8 @@ const TABS: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode 
     id: "predictions",
     label: "Predictions",
     shortLabel: "Pred.",
+    compareHint:
+      "Forecast time series for your selected models. Same runs as Metrics and Analysis.",
     icon: (
       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" />
@@ -48,6 +60,8 @@ const TABS: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode 
     id: "analysis",
     label: "Analysis",
     shortLabel: "Analysis",
+    compareHint:
+      "Extra diagnostics (errors by hour, calibration, and similar). Same runs as Metrics and Predictions.",
     icon: (
       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714a2.25 2.25 0 00.659 1.591L19 14.5M14.25 3.104c.251.023.501.05.75.082M19 14.5l-1.756-1.756a2.25 2.25 0 00-1.591-.659H8.347a2.25 2.25 0 00-1.591.659L5 14.5m14 0v4.25A2.25 2.25 0 0116.75 21h-9.5A2.25 2.25 0 015 18.75V14.5" />
@@ -170,6 +184,7 @@ export default function Dashboard() {
               key={tab.id}
               type="button"
               onClick={() => handleTabChange(tab.id)}
+              title={hasModels && tab.compareHint ? tab.compareHint : undefined}
               className={`flex shrink-0 items-center gap-1.5 px-2.5 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 activeTab === tab.id
                   ? "border-blue-600 text-blue-600"
@@ -252,6 +267,14 @@ export default function Dashboard() {
                     )}
                   </div>
                 </div>
+              )}
+              {hasModels && showExperimentsChrome && (
+                <CompareModelsContextBanner
+                  onShowMethodologyOverview={() => {
+                    setSelectedModels([]);
+                    closeExperiments();
+                  }}
+                />
               )}
               <div className="min-h-0 flex-1 overflow-y-auto">
                 {!hasModels ? (

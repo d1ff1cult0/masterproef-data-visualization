@@ -106,6 +106,11 @@ export default function MethodologySection() {
         <p className="text-sm text-zinc-500 mt-0.5">
           Standard setup used across all experiments for fair comparison.
         </p>
+        <p className="mt-3 max-w-3xl rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
+          When you pick models in the sidebar, the <strong>Metrics</strong>, <strong>Predictions</strong>, and{" "}
+          <strong>Analysis</strong> tabs are only different views of the same runs. This methodology section stays on
+          this overview page.
+        </p>
       </div>
 
       <div className="prose prose-sm max-w-none text-zinc-700 space-y-4">
