@@ -17,9 +17,15 @@ import {
   ResponsiveContainer,
   Legend,
   ReferenceLine,
+  ReferenceArea,
   Cell,
 } from "recharts";
 import type { EDAResult, SummaryStatRow } from "@/lib/eda";
+import {
+  EXPERIMENT_DATA_SPLIT,
+  SPLIT_OVERLAY_COLORS,
+  getVisibleSplitSegmentBounds,
+} from "@/lib/experiment-split-overlay";
 import { ZoomableTimeSeriesChart } from "./ZoomableTimeSeriesChart";
 import { ExportableChart } from "./ExportableChart";
 import ExportSettingsModal from "./ExportSettingsModal";
@@ -58,6 +64,17 @@ const COLORS = {
   cyan: "#0891b2",
   orange: "#ea580c",
   pink: "#db2777",
+};
+
+/** Top legend + margins so PNG exports avoid large empty bands under default bottom legends. */
+const EDA_MARGIN_TOP_LEGEND = { top: 28, right: 12, bottom: 16, left: 52 };
+/** More bottom space for angled X-axis labels. */
+const EDA_MARGIN_TOP_LEGEND_ANGL = { top: 28, right: 12, bottom: 40, left: 52 };
+
+const EDA_LEGEND_TOP_PROPS = {
+  verticalAlign: "top" as const,
+  align: "center" as const,
+  wrapperStyle: { fontSize: 11, lineHeight: "14px", paddingBottom: 0 } as const,
 };
 
 // ──────────────────── Collapsible Section ────────────────────
@@ -324,21 +341,151 @@ function EDAViewContent({ data }: { data: EDAResult }) {
             edaRegister={{ key: "eda-ts-daily-avg-roll", order: 0 }}
           >
           <div>
-            <ZoomableTimeSeriesChart data={data.priceSeries} xDataKey="date" height={350} formatXLabel={(v) => v.slice(5)}>
+            <ZoomableTimeSeriesChart
+              data={data.priceSeries}
+              xDataKey="date"
+              height={350}
+              formatXLabel={(v) => v.slice(5)}
+              margin={EDA_MARGIN_TOP_LEGEND}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v: string) => v.slice(5)} interval={Math.floor(data.priceSeries.length / 12)} />
               <YAxis tick={{ fontSize: 10 }} label={{ value: "EUR/MWh", angle: -90, position: "insideLeft", style: { fontSize: 10 } }} />
               <Tooltip contentStyle={{ fontSize: 11 }} />
               <Line dataKey="avg" stroke={COLORS.primary} strokeWidth={1} dot={false} opacity={0.4} name="Daily Avg" />
               <Line dataKey="rollingMean" stroke={COLORS.secondary} strokeWidth={2} dot={false} name="7d Rolling Mean" />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Legend {...EDA_LEGEND_TOP_PROPS} />
             </ZoomableTimeSeriesChart>
           </div>
           </ExportableChart>
           <ExportableChart
+            title="Daily Average Price with Rolling Mean & Std Band (experiment train / val / test)"
+            filename="eda_BE_hourly_price_daily_average_7d_rolling_mean_std_band_train_val_test_split"
+            edaRegister={{ key: "eda-ts-daily-avg-roll-split", order: 1 }}
+          >
+            <div>
+              <ZoomableTimeSeriesChart
+                data={data.priceSeries}
+                xDataKey="date"
+                height={350}
+                formatXLabel={(v) => v.slice(5)}
+                margin={EDA_MARGIN_TOP_LEGEND}
+              >
+                {(viewData) => {
+                  const ds = EXPERIMENT_DATA_SPLIT;
+                  const trainBounds = getVisibleSplitSegmentBounds(
+                    viewData,
+                    "date",
+                    ds.trainStart,
+                    ds.trainEnd
+                  );
+                  const valBounds = getVisibleSplitSegmentBounds(
+                    viewData,
+                    "date",
+                    ds.valStart,
+                    ds.valEnd
+                  );
+                  const testBounds = getVisibleSplitSegmentBounds(
+                    viewData,
+                    "date",
+                    ds.testStart,
+                    ds.testEnd
+                  );
+                  return (
+                    <>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis
+                        dataKey="date"
+                        tick={{ fontSize: 10 }}
+                        tickFormatter={(v: string) => v.slice(5)}
+                        interval={Math.floor(data.priceSeries.length / 12)}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 10 }}
+                        label={{
+                          value: "EUR/MWh",
+                          angle: -90,
+                          position: "insideLeft",
+                          style: { fontSize: 10 },
+                        }}
+                      />
+                      <Tooltip contentStyle={{ fontSize: 11 }} />
+                      {trainBounds && (
+                        <ReferenceArea
+                          x1={trainBounds.x1}
+                          x2={trainBounds.x2}
+                          fill={SPLIT_OVERLAY_COLORS.train}
+                          fillOpacity={0.2}
+                        />
+                      )}
+                      {valBounds && (
+                        <ReferenceArea
+                          x1={valBounds.x1}
+                          x2={valBounds.x2}
+                          fill={SPLIT_OVERLAY_COLORS.validation}
+                          fillOpacity={0.2}
+                        />
+                      )}
+                      {testBounds && (
+                        <ReferenceArea
+                          x1={testBounds.x1}
+                          x2={testBounds.x2}
+                          fill={SPLIT_OVERLAY_COLORS.test}
+                          fillOpacity={0.2}
+                        />
+                      )}
+                      <Line
+                        dataKey="avg"
+                        stroke={COLORS.primary}
+                        strokeWidth={1}
+                        dot={false}
+                        opacity={0.4}
+                        name="Daily Avg"
+                      />
+                      <Line
+                        dataKey="rollingMean"
+                        stroke={COLORS.secondary}
+                        strokeWidth={2}
+                        dot={false}
+                        name="7d Rolling Mean"
+                      />
+                      <Legend {...EDA_LEGEND_TOP_PROPS} />
+                    </>
+                  );
+                }}
+              </ZoomableTimeSeriesChart>
+              <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-600">
+                <span className="flex items-center gap-1.5">
+                  <span
+                    className="h-2 w-4 shrink-0 rounded-sm"
+                    style={{ backgroundColor: SPLIT_OVERLAY_COLORS.train }}
+                  />
+                  Train
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span
+                    className="h-2 w-4 shrink-0 rounded-sm"
+                    style={{ backgroundColor: SPLIT_OVERLAY_COLORS.validation }}
+                  />
+                  Validation
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span
+                    className="h-2 w-4 shrink-0 rounded-sm"
+                    style={{ backgroundColor: SPLIT_OVERLAY_COLORS.test }}
+                  />
+                  Test
+                </span>
+                <span className="text-zinc-500">
+                  Same date ranges as on the Experiment Methodology page (Data Split Timeline).
+                </span>
+              </p>
+            </div>
+          </ExportableChart>
+          <ExportableChart
             title="7-Day Rolling Standard Deviation"
             filename="eda_BE_hourly_price_7d_rolling_standard_deviation"
-            edaRegister={{ key: "eda-ts-rolling-std", order: 1 }}
+            edaRegister={{ key: "eda-ts-rolling-std", order: 2 }}
           >
           <div>
             <ZoomableTimeSeriesChart data={data.priceSeries} xDataKey="date" height={200} chartType="LineChart" formatXLabel={(v) => v.slice(5)}>
@@ -353,18 +500,21 @@ function EDAViewContent({ data }: { data: EDAResult }) {
           <ExportableChart
             title="Monthly Average Prices"
             filename="eda_BE_hourly_price_monthly_mean_and_median_bars"
-            edaRegister={{ key: "eda-ts-monthly", order: 2 }}
+            edaRegister={{ key: "eda-ts-monthly", order: 3 }}
           >
           <div>
             <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={data.monthlyAvgPrices}>
+              <BarChart
+                data={data.monthlyAvgPrices}
+                margin={{ top: 28, right: 12, bottom: 36, left: 12 }}
+              >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="month" tick={{ fontSize: 10 }} interval={0} angle={-45} textAnchor="end" height={50} />
                 <YAxis tick={{ fontSize: 10 }} label={{ value: "EUR/MWh", angle: -90, position: "insideLeft", style: { fontSize: 10 } }} />
                 <Tooltip contentStyle={{ fontSize: 11 }} />
                 <Bar dataKey="avg" fill={COLORS.primary} name="Mean" radius={[2, 2, 0, 0]} />
                 <Bar dataKey="median" fill={COLORS.cyan} name="Median" radius={[2, 2, 0, 0]} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Legend {...EDA_LEGEND_TOP_PROPS} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -844,7 +994,14 @@ function EDAViewContent({ data }: { data: EDAResult }) {
             filename="eda_BE_FR_NL_daily_average_day_ahead_price_EUR_per_MWh"
             edaRegister={{ key: "eda-xb-daily", order: 170 }}
           >
-            <ZoomableTimeSeriesChart data={data.crossBorder.daily} xDataKey="date" height={300} formatXLabel={(v) => v.slice(5)} chartType="LineChart">
+            <ZoomableTimeSeriesChart
+              data={data.crossBorder.daily}
+              xDataKey="date"
+              height={300}
+              formatXLabel={(v) => v.slice(5)}
+              chartType="LineChart"
+              margin={EDA_MARGIN_TOP_LEGEND}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={(v: string) => v.slice(5)} interval={Math.floor(data.crossBorder.daily.length / 10)} />
               <YAxis tick={{ fontSize: 10 }} label={{ value: "EUR/MWh", angle: -90, position: "insideLeft", style: { fontSize: 10 } }} />
@@ -852,7 +1009,7 @@ function EDAViewContent({ data }: { data: EDAResult }) {
               <Line dataKey="BE" stroke={COLORS.primary} strokeWidth={1.5} dot={false} name="Belgium" />
               <Line dataKey="FR" stroke={COLORS.secondary} strokeWidth={1} dot={false} opacity={0.7} name="France" />
               <Line dataKey="NL" stroke={COLORS.tertiary} strokeWidth={1} dot={false} opacity={0.7} name="Netherlands" />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Legend {...EDA_LEGEND_TOP_PROPS} />
             </ZoomableTimeSeriesChart>
           </ExportableChart>
           <ExportableChart
@@ -860,7 +1017,13 @@ function EDAViewContent({ data }: { data: EDAResult }) {
             filename="eda_BE_minus_FR_and_BE_minus_NL_daily_price_spread_EUR_per_MWh"
             edaRegister={{ key: "eda-xb-spreads", order: 171 }}
           >
-            <ZoomableTimeSeriesChart data={data.crossBorder.spreads} xDataKey="date" height={250} formatXLabel={(v) => v.slice(5)}>
+            <ZoomableTimeSeriesChart
+              data={data.crossBorder.spreads}
+              xDataKey="date"
+              height={250}
+              formatXLabel={(v) => v.slice(5)}
+              margin={EDA_MARGIN_TOP_LEGEND}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={(v: string) => v.slice(5)} interval={Math.floor(data.crossBorder.spreads.length / 10)} />
               <YAxis tick={{ fontSize: 10 }} />
@@ -868,7 +1031,7 @@ function EDAViewContent({ data }: { data: EDAResult }) {
               <ReferenceLine y={0} stroke="#999" strokeDasharray="3 3" />
               <Line dataKey="BE_FR" stroke={COLORS.secondary} strokeWidth={1} dot={false} name="BE - FR" opacity={0.7} />
               <Line dataKey="BE_NL" stroke={COLORS.tertiary} strokeWidth={1} dot={false} name="BE - NL" opacity={0.7} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Legend {...EDA_LEGEND_TOP_PROPS} />
             </ZoomableTimeSeriesChart>
           </ExportableChart>
           <div>
@@ -1002,14 +1165,19 @@ function EDAViewContent({ data }: { data: EDAResult }) {
           filename="eda_BE_weekly_average_wind_and_solar_forecast_MW"
           edaRegister={{ key: "eda-renew-weekly", order: 182 }}
         >
-          <ZoomableTimeSeriesChart data={data.renewables.weekly} xDataKey="week" height={300}>
+          <ZoomableTimeSeriesChart
+            data={data.renewables.weekly}
+            xDataKey="week"
+            height={300}
+            margin={EDA_MARGIN_TOP_LEGEND_ANGL}
+          >
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis dataKey="week" tick={{ fontSize: 9 }} interval={Math.floor(data.renewables.weekly.length / 12)} angle={-45} textAnchor="end" height={50} />
             <YAxis tick={{ fontSize: 10 }} label={{ value: "MW", angle: -90, position: "insideLeft", style: { fontSize: 10 } }} />
             <Tooltip contentStyle={{ fontSize: 11 }} />
             <Area dataKey="solar" fill={COLORS.quaternary} fillOpacity={0.3} stroke={COLORS.quaternary} strokeWidth={1.5} name="Solar" />
             <Line dataKey="wind" stroke={COLORS.cyan} strokeWidth={2} dot={false} name="Wind" />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Legend {...EDA_LEGEND_TOP_PROPS} />
           </ZoomableTimeSeriesChart>
         </ExportableChart>
       ))}
@@ -1021,7 +1189,13 @@ function EDAViewContent({ data }: { data: EDAResult }) {
           filename="eda_BE_weekly_average_cross_border_flows_BE_NL_BE_FR_BE_DE_MW"
           edaRegister={{ key: "eda-flows-weekly", order: 183 }}
         >
-          <ZoomableTimeSeriesChart data={data.crossBorderFlows.weekly} xDataKey="week" height={300} chartType="LineChart">
+          <ZoomableTimeSeriesChart
+            data={data.crossBorderFlows.weekly}
+            xDataKey="week"
+            height={300}
+            chartType="LineChart"
+            margin={EDA_MARGIN_TOP_LEGEND_ANGL}
+          >
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis dataKey="week" tick={{ fontSize: 9 }} interval={Math.floor(data.crossBorderFlows.weekly.length / 12)} angle={-45} textAnchor="end" height={50} />
             <YAxis tick={{ fontSize: 10 }} label={{ value: "MW", angle: -90, position: "insideLeft", style: { fontSize: 10 } }} />
@@ -1030,7 +1204,7 @@ function EDAViewContent({ data }: { data: EDAResult }) {
             <Line dataKey="BE_NL" stroke={COLORS.primary} strokeWidth={1.5} dot={false} name="BE-NL" />
             <Line dataKey="BE_FR" stroke={COLORS.secondary} strokeWidth={1.5} dot={false} name="BE-FR" />
             <Line dataKey="BE_DE" stroke={COLORS.tertiary} strokeWidth={1.5} dot={false} name="BE-DE" />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Legend {...EDA_LEGEND_TOP_PROPS} />
           </ZoomableTimeSeriesChart>
         </ExportableChart>
       ))}
@@ -1238,7 +1412,13 @@ function EDAViewContent({ data }: { data: EDAResult }) {
             filename="eda_BE_hourly_price_14d_rolling_volatility_and_daily_average_price"
             edaRegister={{ key: "eda-vol-daily", order: 920 }}
           >
-            <ZoomableTimeSeriesChart data={data.volatility.daily} xDataKey="date" height={280} formatXLabel={(v) => v.slice(5)}>
+            <ZoomableTimeSeriesChart
+              data={data.volatility.daily}
+              xDataKey="date"
+              height={280}
+              formatXLabel={(v) => v.slice(5)}
+              margin={EDA_MARGIN_TOP_LEGEND}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={(v: string) => v.slice(5)} interval={Math.floor(data.volatility.daily.length / 10)} />
               <YAxis yAxisId="vol" tick={{ fontSize: 10 }} label={{ value: "Volatility", angle: -90, position: "insideLeft", style: { fontSize: 10 } }} />
@@ -1246,7 +1426,7 @@ function EDAViewContent({ data }: { data: EDAResult }) {
               <Tooltip contentStyle={{ fontSize: 11 }} />
               <Line yAxisId="price" dataKey="price" stroke={COLORS.primary} strokeWidth={1} dot={false} opacity={0.3} name="Avg Price" />
               <Area yAxisId="vol" dataKey="volatility" fill={COLORS.secondary} fillOpacity={0.15} stroke={COLORS.secondary} strokeWidth={1.5} name="Volatility" />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Legend {...EDA_LEGEND_TOP_PROPS} />
             </ZoomableTimeSeriesChart>
           </ExportableChart>
           <ExportableChart

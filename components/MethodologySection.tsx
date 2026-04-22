@@ -13,47 +13,11 @@ import {
 import { ZoomableTimeSeriesChart } from "./ZoomableTimeSeriesChart";
 import { ExportableChart } from "./ExportableChart";
 import { METHODOLOGY } from "@/lib/methodology";
-
-const TRAIN_COLOR = "#2563eb";
-const VAL_COLOR = "#16a34a";
-const TEST_COLOR = "#dc2626";
-
-function parseDate(s: string): number {
-  return new Date(s + "T00:00:00Z").getTime();
-}
-
-/** Returns { x1, x2 } for ReferenceArea, using dates that exist in viewData so colors render when zoomed. */
-function getVisibleSegmentBounds(
-  viewData: { date?: string; [key: string]: unknown }[],
-  xDataKey: string,
-  segmentStart: string,
-  segmentEnd: string
-): { x1: string; x2: string } | null {
-  if (viewData.length === 0) return null;
-  const segStart = parseDate(segmentStart);
-  const segEnd = parseDate(segmentEnd);
-  const firstVisible = String(viewData[0]?.[xDataKey] ?? "");
-  const lastVisible = String(viewData[viewData.length - 1]?.[xDataKey] ?? "");
-  const visibleStart = firstVisible ? parseDate(firstVisible) : 0;
-  const visibleEnd = lastVisible ? parseDate(lastVisible) : 0;
-
-  const overlapStart = Math.max(visibleStart, segStart);
-  const overlapEnd = Math.min(visibleEnd, segEnd);
-  if (overlapStart >= overlapEnd) return null;
-
-  let x1: string | null = null;
-  let x2: string | null = null;
-  for (const d of viewData) {
-    const dateStr = String(d[xDataKey] ?? "");
-    if (!dateStr) continue;
-    const t = parseDate(dateStr);
-    if (t >= overlapStart && t <= overlapEnd) {
-      if (!x1) x1 = dateStr;
-      x2 = dateStr;
-    }
-  }
-  return x1 && x2 ? { x1, x2 } : null;
-}
+import {
+  SPLIT_OVERLAY_COLORS,
+  getVisibleSplitSegmentBounds,
+  parseExperimentDate,
+} from "@/lib/experiment-split-overlay";
 
 export default function MethodologySection() {
   const { dataSplit, sequenceConfig, modelConfig, trainingConfig } = METHODOLOGY;
@@ -68,28 +32,28 @@ export default function MethodologySection() {
       .finally(() => setLoading(false));
   }, []);
 
-  const start = parseDate(dataSplit.trainStart);
-  const end = parseDate(dataSplit.testEnd);
+  const start = parseExperimentDate(dataSplit.trainStart);
+  const end = parseExperimentDate(dataSplit.testEnd);
   const total = end - start;
 
   const segments = [
     {
       label: "Train",
-      start: parseDate(dataSplit.trainStart),
-      end: parseDate(dataSplit.trainEnd),
-      color: TRAIN_COLOR,
+      start: parseExperimentDate(dataSplit.trainStart),
+      end: parseExperimentDate(dataSplit.trainEnd),
+      color: SPLIT_OVERLAY_COLORS.train,
     },
     {
       label: "Validation",
-      start: parseDate(dataSplit.valStart),
-      end: parseDate(dataSplit.valEnd),
-      color: VAL_COLOR,
+      start: parseExperimentDate(dataSplit.valStart),
+      end: parseExperimentDate(dataSplit.valEnd),
+      color: SPLIT_OVERLAY_COLORS.validation,
     },
     {
       label: "Test",
-      start: parseDate(dataSplit.testStart),
-      end: parseDate(dataSplit.testEnd),
-      color: TEST_COLOR,
+      start: parseExperimentDate(dataSplit.testStart),
+      end: parseExperimentDate(dataSplit.testEnd),
+      color: SPLIT_OVERLAY_COLORS.test,
     },
   ].map((s) => ({
     ...s,
@@ -154,19 +118,19 @@ export default function MethodologySection() {
               }
             >
               {(viewData) => {
-                const trainBounds = getVisibleSegmentBounds(
+                const trainBounds = getVisibleSplitSegmentBounds(
                   viewData,
                   "date",
                   dataSplit.trainStart,
                   dataSplit.trainEnd
                 );
-                const valBounds = getVisibleSegmentBounds(
+                const valBounds = getVisibleSplitSegmentBounds(
                   viewData,
                   "date",
                   dataSplit.valStart,
                   dataSplit.valEnd
                 );
-                const testBounds = getVisibleSegmentBounds(
+                const testBounds = getVisibleSplitSegmentBounds(
                   viewData,
                   "date",
                   dataSplit.testStart,
@@ -210,7 +174,7 @@ export default function MethodologySection() {
                       <ReferenceArea
                         x1={trainBounds.x1}
                         x2={trainBounds.x2}
-                        fill={TRAIN_COLOR}
+                        fill={SPLIT_OVERLAY_COLORS.train}
                         fillOpacity={0.2}
                       />
                     )}
@@ -218,7 +182,7 @@ export default function MethodologySection() {
                       <ReferenceArea
                         x1={valBounds.x1}
                         x2={valBounds.x2}
-                        fill={VAL_COLOR}
+                        fill={SPLIT_OVERLAY_COLORS.validation}
                         fillOpacity={0.2}
                       />
                     )}
@@ -226,7 +190,7 @@ export default function MethodologySection() {
                       <ReferenceArea
                         x1={testBounds.x1}
                         x2={testBounds.x2}
-                        fill={TEST_COLOR}
+                        fill={SPLIT_OVERLAY_COLORS.test}
                         fillOpacity={0.2}
                       />
                     )}

@@ -25,7 +25,7 @@ export function ZoomableTimeSeriesChart({
   data,
   xDataKey,
   height = 280,
-  margin = { top: 10, right: 10, bottom: 30, left: 50 },
+  margin = { top: 10, right: 12, bottom: 20, left: 52 },
   children,
   chartType = "ComposedChart",
   minZoomPoints = 12,
@@ -140,7 +140,7 @@ export function ZoomableTimeSeriesChart({
 
   return (
     <div>
-      <div className="text-xs text-zinc-400 mb-2 flex items-center justify-between gap-2">
+      <div className="chart-export-exclude text-xs text-zinc-400 mb-2 flex items-center justify-between gap-2">
         <span>
           {isZoomed
             ? `Zoomed: ${formatXLabel ? formatXLabel(String(firstX)) : String(firstX)} to ${formatXLabel ? formatXLabel(String(lastX)) : String(lastX)} (${viewData.length} points) — use arrows to scroll, drag to zoom further`

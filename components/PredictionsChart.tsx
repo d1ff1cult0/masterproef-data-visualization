@@ -26,6 +26,15 @@ interface PredictionsChartProps {
   selectedModels: SelectedModel[];
 }
 
+/** Tighter PNG exports: top legend + room for angled date ticks. */
+const PRED_COMPOSED_MARGIN = { top: 32, right: 20, left: 14, bottom: 36 };
+const PRED_BAR_MARGIN = { top: 28, right: 20, left: 14, bottom: 16 };
+const PRED_LEGEND_TOP_PROPS = {
+  verticalAlign: "top" as const,
+  align: "center" as const,
+  wrapperStyle: { fontSize: 11, lineHeight: "14px", paddingBottom: 0 } as const,
+};
+
 interface MergedPoint {
   index: number;
   date: string;
@@ -660,9 +669,9 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
             <ResponsiveContainer width="100%" height={460}>
               <ComposedChart
                 data={viewData}
-                margin={{ top: 10, right: 20, left: 10, bottom: 30 }}
-                onMouseDown={handleMouseDown as any}
-                onMouseMove={handleMouseMove as any}
+                margin={PRED_COMPOSED_MARGIN}
+                onMouseDown={handleMouseDown as never}
+                onMouseMove={handleMouseMove as never}
                 onMouseUp={handleMouseUp}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
@@ -697,7 +706,7 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
                   }}
                   labelFormatter={(label) => String(label)}
                 />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Legend {...PRED_LEGEND_TOP_PROPS} />
 
                 {showQuantiles &&
                   modelKeys.map(({ prefix, color }) =>
@@ -834,7 +843,7 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
             <ResponsiveContainer width="100%" height={280}>
               <ComposedChart
                 data={residualsData}
-                margin={{ top: 10, right: 20, left: 10, bottom: 30 }}
+                margin={PRED_COMPOSED_MARGIN}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
                 <XAxis
@@ -869,7 +878,7 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
                   }}
                   labelFormatter={(label) => String(label)}
                 />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Legend {...PRED_LEGEND_TOP_PROPS} />
                 {modelKeys.map(({ prefix, color, label }) => (
                   <Line
                     key={prefix}
@@ -909,7 +918,7 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart
                   data={histogramData}
-                  margin={{ top: 10, right: 20, left: 10, bottom: 30 }}
+                  margin={PRED_BAR_MARGIN}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
                   <XAxis
@@ -941,7 +950,7 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
                       borderRadius: 6,
                     }}
                   />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Legend {...PRED_LEGEND_TOP_PROPS} />
                   {modelKeys.map(({ prefix, color, label }) => (
                     <Bar
                       key={prefix}
