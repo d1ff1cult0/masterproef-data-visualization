@@ -74,7 +74,14 @@ const EDA_MARGIN_TOP_LEGEND_ANGL = { top: 28, right: 12, bottom: 40, left: 52 };
 const EDA_LEGEND_TOP_PROPS = {
   verticalAlign: "top" as const,
   align: "center" as const,
-  wrapperStyle: { fontSize: 11, lineHeight: "14px", paddingBottom: 0 } as const,
+  wrapperStyle: {
+    fontSize: 11,
+    lineHeight: "14px",
+    paddingBottom: 0,
+    width: "100%",
+    display: "flex",
+    justifyContent: "center",
+  } as const,
 };
 
 // ──────────────────── Collapsible Section ────────────────────
@@ -454,7 +461,7 @@ function EDAViewContent({ data }: { data: EDAResult }) {
                   );
                 }}
               </ZoomableTimeSeriesChart>
-              <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-600">
+              <p className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1 text-center text-[11px] text-zinc-600">
                 <span className="flex items-center gap-1.5">
                   <span
                     className="h-2 w-4 shrink-0 rounded-sm"
@@ -475,9 +482,6 @@ function EDAViewContent({ data }: { data: EDAResult }) {
                     style={{ backgroundColor: SPLIT_OVERLAY_COLORS.test }}
                   />
                   Test
-                </span>
-                <span className="text-zinc-500">
-                  Same date ranges as on the Experiment Methodology page (Data Split Timeline).
                 </span>
               </p>
             </div>

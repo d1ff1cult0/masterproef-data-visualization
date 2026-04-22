@@ -32,7 +32,14 @@ const PRED_BAR_MARGIN = { top: 28, right: 20, left: 14, bottom: 16 };
 const PRED_LEGEND_TOP_PROPS = {
   verticalAlign: "top" as const,
   align: "center" as const,
-  wrapperStyle: { fontSize: 11, lineHeight: "14px", paddingBottom: 0 } as const,
+  wrapperStyle: {
+    fontSize: 11,
+    lineHeight: "14px",
+    paddingBottom: 0,
+    width: "100%",
+    display: "flex",
+    justifyContent: "center",
+  } as const,
 };
 
 interface MergedPoint {
