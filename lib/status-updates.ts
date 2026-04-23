@@ -12,6 +12,7 @@ export interface StatusUpdateSection {
   text?: string;
   items?: string[] | { term: string; description: string }[];
   images?: { src: string; alt: string }[];
+  size?: "small" | "medium" | "full";
   caption?: string;
   references?: { key: string; text: string }[];
   table?: { headers: string[]; rows: (string | number)[][]; caption?: string };
@@ -1319,7 +1320,7 @@ export const STATUS_UPDATES: StatusUpdate[] = [
       },
       {
         type: "paragraph",
-        text: "Right after our last meeting I implemented Chris' suggestion to retrain the transformer on the full training set (including the part previously used for validation) before running it on the test set. This finally pushed the model past the LEAR threshold: averaged over 10 runs the transformer reached a MAE of 14.09, compared to LEAR's 14.24. So for the first time the transformer is clearly beating our main baseline, which is a nice milestone to have.",
+        text: "Right after our last meeting I implemented Chris' suggestion to retrain the transformer on the full training set (including the part previously used for validation) before running it on the test set. This finally pushed the model past the LEAR threshold: averaged over 10 runs the transformer reached a MAE of 14.09, compared to LEAR's 14.24. For the first time the transformer is clearly beating our main baseline, which is a nice milestone to have.",
       },
       {
         type: "heading",
@@ -1346,6 +1347,7 @@ export const STATUS_UPDATES: StatusUpdate[] = [
       {
         type: "figure",
         images: [{ src: "/status-updates/update8/val_set_trick.png", alt: "Validation set trick: comparison of standard vs. beginning-of-dataset validation" }],
+        size: "small",
         caption: "Comparison of the standard validation split (end of training period) versus using the beginning of the dataset as validation set. The results are largely similar across both strategies.",
       },
       {
@@ -1355,11 +1357,7 @@ export const STATUS_UPDATES: StatusUpdate[] = [
       },
       {
         type: "paragraph",
-        text: "Chris rightfully pointed out that dropout should already act as an implicit ensemble inside a neural network — it randomly deactivates neurons during training, which forces the model to learn more robust representations and is theoretically similar to averaging many sub-networks. This led to the hypothesis that if ensembling multiple transformer runs helps a lot, maybe the dropout rate is just too low and increasing it would reduce the need for explicit ensembling.",
-      },
-      {
-        type: "paragraph",
-        text: "To test this, I ran a grid search over 6 dropout levels (0.10 to 0.50) and 3 model sizes (Small d192, Medium d256, Large d384), with 5 runs per configuration for a total of 90 training runs. For each configuration I also computed the best ensemble MAE from progressively combining those 5 runs, to measure how much explicit ensembling still helps on top of the dropout.",
+        text: "Chris rightfully pointed out that dropout should already act as an implicit ensemble inside a neural network, since it randomly drops neurons during training and is theoretically similar to averaging many sub-networks. The hypothesis was therefore that higher dropout would reduce the gain from explicit ensembling. To test this, I ran a grid search over 6 dropout levels (0.10 to 0.50) and 3 model sizes (Small d192, Medium d256, Large d384), with 5 runs per configuration for a total of 90 training runs.",
       },
       {
         type: "table",
@@ -1390,15 +1388,11 @@ export const STATUS_UPDATES: StatusUpdate[] = [
       },
       {
         type: "paragraph",
-        text: "The results don't quite confirm what either Chris or I expected. The hypothesis was that higher dropout would reduce the ensemble gain, because a model with more dropout already acts like an ensemble internally. Instead, the overall correlation between dropout rate and ensemble gain is positive (Pearson r = 0.45), meaning higher dropout actually tends to increase the gap between a single run and the ensemble. This is clearest for the Large model, where the correlation is r = 0.90 with p = 0.015: at dropout 0.50 the ensemble gain goes up to 2.90, the highest value in the entire grid. What seems to happen is that high dropout makes individual runs much more noisy and unstable, so the variance across runs goes up and averaging them becomes more valuable, not less.",
+        text: "The results don't confirm what either Chris or I expected. Instead of a negative correlation between dropout and ensemble gain, the overall Pearson correlation is positive (r = 0.45), meaning higher dropout actually tends to increase the gap between a single run and the ensemble. This is likely because high dropout makes individual runs more noisy and variable, which makes averaging more valuable rather than less. The effect is strongest for the Large model (r = 0.90, p = 0.015), where the ensemble gain at dropout 0.50 reaches 2.90, the highest in the whole grid.",
       },
       {
         type: "paragraph",
-        text: "The practical sweet spot turns out to be the Medium model (d256) at dropout 0.15 or 0.20. This gives the best average single-run MAE (15.73), the best CRPS (11.16), the lowest run-to-run standard deviation (0.29), and the smallest ensemble gain (1.00) — meaning individual runs are already quite good and you don't gain much from running many. High dropout (0.40 or above) is clearly harmful across all three model sizes. The Large model doesn't help either, it's more sensitive to dropout and shows higher variance without clear performance gains.",
-      },
-      {
-        type: "paragraph",
-        text: "One other observation: even at optimal dropout, a single run can't beat a good ensemble. The best individual run across the whole grid had MAE 14.64 (Medium d256, dropout 0.10), but that was just a lucky run out of 5 — the mean for that configuration was 16.18. So explicit ensembling is still clearly worth doing, and dropout alone is not a substitute for it.",
+        text: "The practical sweet spot is the Medium model (d256) at dropout 0.15 or 0.20, which gives the best single-run MAE (15.73), best CRPS (11.16), and lowest run-to-run variability (std = 0.29). High dropout (0.40 or above) is consistently harmful across all model sizes, and the Large model doesn't help. Explicit ensembling is still clearly worth doing regardless of the dropout setting.",
       },
     ],
   },

@@ -122,10 +122,11 @@ function SectionRenderer({ section }: { section: StatusUpdateSection }) {
       );
     }
 
-    case "figure":
+    case "figure": {
+      const sizeClass = section.size === "small" ? "max-w-sm" : section.size === "medium" ? "max-w-xl" : "max-w-full";
       return (
         <figure className="my-8 space-y-4">
-          <div className="grid gap-4" style={{ gridTemplateColumns: section.images && section.images.length > 1 ? "repeat(auto-fit, minmax(280px, 1fr))" : "1fr" }}>
+          <div className={`grid gap-4 ${sizeClass}`} style={{ gridTemplateColumns: section.images && section.images.length > 1 ? "repeat(auto-fit, minmax(280px, 1fr))" : "1fr" }}>
             {section.images?.map((img, i) => (
               <StatusUpdateImage key={i} src={img.src} alt={img.alt} />
             ))}
@@ -137,6 +138,7 @@ function SectionRenderer({ section }: { section: StatusUpdateSection }) {
           )}
         </figure>
       );
+    }
 
     case "references":
       return (
