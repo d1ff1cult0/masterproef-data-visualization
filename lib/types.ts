@@ -130,4 +130,9 @@ export const EXPERIMENT_NOTEBOOK_MAP: Record<string, number> = {
   transformer_optimization: 25,
   feature_selection_v2: 26,
   closing_the_gap: 27,
+  final_model: 28,
+  val_split_trick: 29,
+  dropout_model_size: 30,
+  rolling_quickstart: 32,
+  rolling_quickstart_pit: 32,
 };
