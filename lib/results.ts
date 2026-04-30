@@ -28,30 +28,63 @@ export function generateDateLabels(
   return labels;
 }
 
-function isExperimentDir(dirPath: string): boolean {
-  if (!fs.existsSync(dirPath) || !fs.statSync(dirPath).isDirectory()) return false;
-  const entries = fs.readdirSync(dirPath);
-  for (const entry of entries) {
-    const subPath = path.join(dirPath, entry);
-    if (!fs.statSync(subPath).isDirectory()) continue;
-    const subEntries = fs.readdirSync(subPath);
-    if (subEntries.some((e) => e.startsWith("run_"))) return true;
-  }
-  return false;
+function dirContainsRunSubdirs(absDir: string): boolean {
+  if (!fs.existsSync(absDir) || !fs.statSync(absDir).isDirectory()) return false;
+  return fs.readdirSync(absDir).some((e) => {
+    if (!e.startsWith("run_")) return false;
+    return fs.statSync(path.join(absDir, e)).isDirectory();
+  });
 }
 
-function getModelInfo(modelPath: string): ModelInfo | null {
+/**
+ * Model directories are leaves that directly contain run_* folders (e.g. lag_study/foo
+ * or rolling_quickstart/rolling/baseline). Supports arbitrary nesting.
+ */
+function findModelRelativePaths(experimentRoot: string): string[] {
+  const out: string[] = [];
+
+  function walk(rel: string): void {
+    const abs = rel ? path.join(experimentRoot, rel) : experimentRoot;
+    if (!fs.existsSync(abs) || !fs.statSync(abs).isDirectory()) return;
+    if (dirContainsRunSubdirs(abs)) {
+      out.push(rel);
+      return;
+    }
+    for (const ent of fs.readdirSync(abs)) {
+      if (ent.startsWith("run_")) continue;
+      const childAbs = path.join(abs, ent);
+      if (!fs.statSync(childAbs).isDirectory()) continue;
+      const childRel = rel ? `${rel}/${ent}` : ent;
+      walk(childRel);
+    }
+  }
+
+  walk("");
+  out.sort((a, b) => a.localeCompare(b));
+  return out;
+}
+
+function isExperimentDir(dirPath: string): boolean {
+  if (!fs.existsSync(dirPath) || !fs.statSync(dirPath).isDirectory()) return false;
+  return findModelRelativePaths(dirPath).length > 0;
+}
+
+function getModelInfo(experimentDir: string, relModelPath: string): ModelInfo | null {
+  const modelPath = path.join(experimentDir, ...relModelPath.split("/"));
   if (!fs.existsSync(modelPath) || !fs.statSync(modelPath).isDirectory()) return null;
   const entries = fs.readdirSync(modelPath);
   const runDirs = entries.filter((e) => e.startsWith("run_") && fs.statSync(path.join(modelPath, e)).isDirectory());
   if (runDirs.length === 0) return null;
 
   const hasSummary = fs.existsSync(path.join(modelPath, "summary.json"));
-  const dirName = path.basename(modelPath);
+  const displayName = relModelPath
+    .split("/")
+    .map((seg) => seg.replace(/_/g, " ").replace(/\(([^)]+)\)/g, "($1)"))
+    .join(" / ");
 
   return {
-    name: dirName,
-    displayName: dirName.replace(/_/g, " ").replace(/\(([^)]+)\)/g, "($1)"),
+    name: relModelPath,
+    displayName,
     runs: runDirs.length,
     hasSummary,
   };
@@ -67,11 +100,10 @@ export function listExperiments(): Experiment[] {
     const dirPath = path.join(RESULTS_DIR, entry);
     if (!isExperimentDir(dirPath)) continue;
 
-    const subEntries = fs.readdirSync(dirPath);
     const models: ModelInfo[] = [];
 
-    for (const sub of subEntries) {
-      const modelInfo = getModelInfo(path.join(dirPath, sub));
+    for (const rel of findModelRelativePaths(dirPath)) {
+      const modelInfo = getModelInfo(dirPath, rel);
       if (modelInfo) models.push(modelInfo);
     }
 

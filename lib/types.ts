@@ -135,4 +135,7 @@ export const EXPERIMENT_NOTEBOOK_MAP: Record<string, number> = {
   dropout_model_size: 30,
   rolling_quickstart: 32,
   rolling_quickstart_pit: 32,
+  rolling_pit: 32,
+  rolling_pit_full: 32,
+  feature_ablation_prices_vs_full: 38,
 };
