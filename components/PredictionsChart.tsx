@@ -18,6 +18,7 @@ import {
   Legend,
 } from "recharts";
 import type { SelectedModel, PredictionResponse, PredictionPoint } from "@/lib/types";
+import { predictionSeriesFieldPrefix, formatModelPathLabel } from "@/lib/prediction-series-key";
 import { computeExtremeEventStats } from "@/lib/extreme-events";
 import ExtremeEventStatsCard from "./ExtremeEventStatsCard";
 import { ExportableChart } from "./ExportableChart";
@@ -111,32 +112,50 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
   const endDate = dayToDate(endDay);
   const sliderMax = totalDays > 0 ? totalDays : 180;
 
+  const [loadWarnings, setLoadWarnings] = useState<string[]>([]);
+
   // Fetch ALL data once
   const fetchPredictions = useCallback(async () => {
     if (selectedModels.length === 0) return;
     setLoading(true);
     setError(null);
+    setLoadWarnings([]);
 
     try {
       const results = new Map<string, PredictionResponse>();
-      const fetches = selectedModels.map(async (m) => {
-        const key = `${m.experiment}/${m.model}`;
-        const params = new URLSearchParams({
-          experiment: m.experiment,
-          model: m.model,
-          run: m.run,
-          startDay: "0",
-          endDay: "9999",
-        });
-        const res = await fetch(`/api/predictions?${params}`);
-        if (!res.ok) throw new Error(`Failed to fetch predictions for ${key}`);
-        const data: PredictionResponse = await res.json();
-        results.set(key, data);
-        if (data.totalDays > 0) setTotalDays(data.totalDays);
-      });
-
-      await Promise.all(fetches);
+      const warns: string[] = [];
+      await Promise.all(
+        selectedModels.map(async (m) => {
+          const key = `${m.experiment}/${m.model}`;
+          const params = new URLSearchParams({
+            experiment: m.experiment,
+            model: m.model,
+            run: m.run,
+            startDay: "0",
+            endDay: "9999",
+          });
+          const res = await fetch(`/api/predictions?${params}`);
+          if (!res.ok) {
+            let msg = `${key}: HTTP ${res.status}`;
+            try {
+              const body = (await res.json()) as { error?: string };
+              if (body.error) msg = `${key}: ${body.error}`;
+            } catch {
+              /* ignore */
+            }
+            warns.push(msg);
+            return;
+          }
+          const data: PredictionResponse = await res.json();
+          results.set(key, data);
+          if (data.totalDays > 0) setTotalDays(data.totalDays);
+        })
+      );
       setPredictions(results);
+      setLoadWarnings(warns);
+      if (results.size === 0 && warns.length > 0) {
+        setError(warns.join(" · "));
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load predictions");
     } finally {
@@ -150,12 +169,19 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
 
   // Build full merged dataset once
   const allData = useMemo(() => {
-    if (predictions.size === 0) return [];
+    if (predictions.size === 0 || selectedModels.length === 0) return [];
 
-    const firstPred = predictions.values().next().value;
-    if (!firstPred) return [];
+    let basePred: PredictionResponse | null = null;
+    for (const m of selectedModels) {
+      const p = predictions.get(`${m.experiment}/${m.model}`);
+      if (p?.data?.length) {
+        basePred = p;
+        break;
+      }
+    }
+    if (!basePred) return [];
 
-    const points: MergedPoint[] = firstPred.data.map((p: PredictionPoint) => ({
+    const points: MergedPoint[] = basePred.data.map((p: PredictionPoint) => ({
       index: p.index,
       date: p.date,
       day: p.day,
@@ -163,8 +189,11 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
       y_test: p.y_test,
     }));
 
-    for (const [key, pred] of predictions) {
-      const prefix = key.split("/").pop()?.replace(/_/g, " ") ?? key;
+    for (const m of selectedModels) {
+      const predKey = `${m.experiment}/${m.model}`;
+      const pred = predictions.get(predKey);
+      if (!pred?.data?.length) continue;
+      const prefix = predictionSeriesFieldPrefix(m.experiment, m.model);
       for (let i = 0; i < pred.data.length && i < points.length; i++) {
         const d = pred.data[i];
         points[i][`${prefix}_mean`] = d.y_pred_mean ?? d["y_pred_mean"] ?? 0;
@@ -182,7 +211,7 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
     }
 
     return points;
-  }, [predictions]);
+  }, [predictions, selectedModels]);
 
   // Slice by slider controls (client-side, no re-fetch)
   const sliderData = useMemo(() => {
@@ -212,12 +241,17 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
   }, [startDay, endDay]);
 
   const modelKeys = useMemo(() => {
-    return selectedModels.map((m) => ({
-      prefix: m.model.replace(/_/g, " "),
-      color: m.color,
-      label: m.model.replace(/_/g, " "),
-    }));
-  }, [selectedModels]);
+    return selectedModels
+      .filter((m) => {
+        const pred = predictions.get(`${m.experiment}/${m.model}`);
+        return Boolean(pred?.data?.length);
+      })
+      .map((m) => ({
+        prefix: predictionSeriesFieldPrefix(m.experiment, m.model),
+        color: m.color,
+        label: formatModelPathLabel(m.model),
+      }));
+  }, [selectedModels, predictions]);
 
   const formatXTick = (value: string) => {
     if (!value) return "";
@@ -514,6 +548,15 @@ export default function PredictionsChart({ selectedModels }: PredictionsChartPro
           </label>
         </div>
       </div>
+
+      {loadWarnings.length > 0 && (
+        <div
+          className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-md px-3 py-2"
+          role="status"
+        >
+          {loadWarnings.join(" · ")}
+        </div>
+      )}
 
       {/* Navigation controls */}
       <div className="p-4 bg-zinc-50 rounded-lg border border-zinc-200 space-y-3">

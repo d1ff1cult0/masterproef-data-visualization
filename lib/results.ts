@@ -5,7 +5,10 @@ import { METRIC_LABELS } from "./types";
 
 const RESULTS_DIR = process.env.RESULTS_DIR || path.resolve(process.cwd(), "../results");
 
-const TEST_START_DATE = new Date("2025-08-08T00:00:00Z");
+/** Test window start; keep in sync with `scripts/npz_predictions_bundle.py` comment. */
+export const PREDICTION_CHART_TEST_START = new Date("2025-08-08T00:00:00Z");
+
+const TEST_START_DATE = PREDICTION_CHART_TEST_START;
 
 export function getResultsDir(): string {
   return RESULTS_DIR;
@@ -160,6 +163,27 @@ export function readModelSummary(experiment: string, model: string): ModelSummar
 
 export function getPredictionsPath(experiment: string, model: string, runIdx: number): string {
   return path.join(RESULTS_DIR, experiment, model, `run_${runIdx}`, "predictions.npz");
+}
+
+/** Absolute directory for a model path (may contain `/`, e.g. `rolling/online_daily`). */
+export function getModelResultsDir(experiment: string, model: string): string {
+  return path.join(RESULTS_DIR, experiment, model);
+}
+
+/** Run indices under `modelDir` that have a `predictions.npz` file. */
+export function listRunsWithPredictions(experiment: string, model: string): number[] {
+  const modelDir = getModelResultsDir(experiment, model);
+  if (!fs.existsSync(modelDir) || !fs.statSync(modelDir).isDirectory()) return [];
+  const out: number[] = [];
+  for (const ent of fs.readdirSync(modelDir)) {
+    if (!ent.startsWith("run_")) continue;
+    const idx = parseInt(ent.replace("run_", ""), 10);
+    if (Number.isNaN(idx)) continue;
+    const npz = path.join(modelDir, ent, "predictions.npz");
+    if (fs.existsSync(npz)) out.push(idx);
+  }
+  out.sort((a, b) => a - b);
+  return out;
 }
 
 export function getRunCount(experiment: string, model: string): number {

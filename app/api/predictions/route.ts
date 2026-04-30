@@ -1,87 +1,123 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readNpzDayRange, getNpzTotalDays, averageArrays } from "@/lib/npz-reader";
-import { getPredictionsPath, getRunCount, generateDateLabels } from "@/lib/results";
-import type { PredictionPoint, PredictionResponse } from "@/lib/types";
+import fs from "fs";
+import path from "path";
+import { spawnSync } from "child_process";
+import {
+  getPredictionsPath,
+  listRunsWithPredictions,
+} from "@/lib/results";
+import { buildPredictionDataFromMergedArrays } from "@/lib/build-prediction-points";
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = request.nextUrl;
-  const experiment = searchParams.get("experiment");
-  const model = searchParams.get("model");
-  const run = searchParams.get("run") ?? "0";
-  const startDay = parseInt(searchParams.get("startDay") ?? "0");
-  const endDay = searchParams.get("endDay");
+function pythonBinary(): string {
+  return process.env.PYTHON_BIN || "python3";
+}
 
-  if (!experiment || !model) {
+function runNpzMerge(
+  npzPaths: string[]
+): { ok: true; arrays: Record<string, unknown> } | { ok: false; error: string; detail?: string } {
+  if (npzPaths.length === 0) return { ok: false, error: "no_npz_paths" };
+  const script = path.join(process.cwd(), "scripts", "npz_predictions_bundle.py");
+  if (!fs.existsSync(script)) {
+    return { ok: false, error: "bundle_script_missing", detail: script };
+  }
+  const r = spawnSync(pythonBinary(), [script, ...npzPaths], {
+    encoding: "utf-8",
+    maxBuffer: 512 * 1024 * 1024,
+    windowsHide: true,
+  });
+  if (r.error) {
+    return { ok: false, error: "python_spawn_failed", detail: String(r.error) };
+  }
+  const out = (r.stdout || "").trim();
+  if (!out) {
+    return {
+      ok: false,
+      error: "python_empty_stdout",
+      detail: r.stderr?.slice(0, 500) || `exit ${r.status}`,
+    };
+  }
+  try {
+    const j = JSON.parse(out) as { ok?: boolean; arrays?: Record<string, unknown>; error?: string };
+    if (!j.ok) return { ok: false, error: j.error || "python_merge_failed" };
+    if (!j.arrays) return { ok: false, error: "python_no_arrays" };
+    return { ok: true, arrays: j.arrays };
+  } catch (e) {
+    return { ok: false, error: "invalid_json_from_python", detail: String(e) };
+  }
+}
+
+export async function GET(req: NextRequest) {
+  const p = req.nextUrl.searchParams;
+  const experiment = p.get("experiment");
+  const model = p.get("model");
+  const run = p.get("run") ?? "average";
+  const startDay = parseInt(p.get("startDay") || "0", 10);
+  const endDay = parseInt(p.get("endDay") || "9999", 10);
+
+  if (!experiment || model == null || model === "") {
     return NextResponse.json(
-      { error: "experiment and model parameters required" },
+      { error: "experiment and model are required" },
       { status: 400 }
     );
   }
 
-  try {
-    const firstPath = getPredictionsPath(experiment, model, 0);
-    const totalDays = getNpzTotalDays(firstPath);
-
-    const end = endDay ? parseInt(endDay) : Math.min(totalDays, startDay + 30);
-
-    let arrays;
-    if (run === "average") {
-      const nRuns = getRunCount(experiment, model);
-      const allRuns = [];
-      for (let i = 0; i < nRuns; i++) {
-        const p = getPredictionsPath(experiment, model, i);
-        allRuns.push(readNpzDayRange(p, startDay, end));
-      }
-      arrays = averageArrays(allRuns);
-    } else {
-      const runIdx = parseInt(run);
-      const p = getPredictionsPath(experiment, model, runIdx);
-      arrays = readNpzDayRange(p, startDay, end);
+  const npzPaths: string[] = [];
+  if (run === "average") {
+    const idxs = listRunsWithPredictions(experiment, model);
+    for (const i of idxs) npzPaths.push(getPredictionsPath(experiment, model, i));
+  } else {
+    const runIdx = parseInt(run, 10);
+    if (Number.isNaN(runIdx)) {
+      return NextResponse.json({ error: "invalid run" }, { status: 400 });
     }
-
-    const nDays = arrays.y_test?.length ?? 0;
-    const hoursPerDay = arrays.y_test?.[0]?.length ?? 24;
-    const dates = generateDateLabels(nDays, startDay, hoursPerDay);
-    const keys = Object.keys(arrays).filter((k) => k !== "y_test");
-
-    const data: PredictionPoint[] = [];
-    for (let d = 0; d < nDays; d++) {
-      for (let h = 0; h < hoursPerDay; h++) {
-        const idx = d * hoursPerDay + h;
-        const point: PredictionPoint = {
-          index: idx,
-          hour: h,
-          day: startDay + d,
-          date: dates[idx] ?? "",
-          y_test: round(arrays.y_test?.[d]?.[h] ?? 0),
-        };
-        for (const key of keys) {
-          point[key] = round(arrays[key]?.[d]?.[h] ?? 0);
-        }
-        data.push(point);
-      }
+    const single = getPredictionsPath(experiment, model, runIdx);
+    if (!fs.existsSync(single)) {
+      return NextResponse.json(
+        {
+          error: `no predictions.npz for ${experiment}/${model} run_${runIdx}`,
+        },
+        { status: 404 }
+      );
     }
+    npzPaths.push(single);
+  }
 
-    const response: PredictionResponse = {
-      experiment,
-      model,
-      run,
-      totalDays,
-      startDay,
-      endDay: end,
-      keys,
-      data,
-    };
-
-    return NextResponse.json(response);
-  } catch (error) {
+  if (npzPaths.length === 0) {
     return NextResponse.json(
-      { error: `Failed to read predictions: ${error}` },
-      { status: 500 }
+      {
+        error:
+          `no predictions.npz under ${experiment}/${model}. ` +
+          `Rolling baselines often skip test predictions; use online_daily for forecast lines.`,
+      },
+      { status: 404 }
     );
   }
-}
 
-function round(val: number): number {
-  return Math.round(val * 100) / 100;
+  const merged = runNpzMerge(npzPaths);
+  if (!merged.ok) {
+    const body: Record<string, unknown> = { error: merged.error };
+    if ("detail" in merged && merged.detail) body.detail = merged.detail;
+    return NextResponse.json(body, { status: 500 });
+  }
+
+  let { keys, data, totalDays } = buildPredictionDataFromMergedArrays(merged.arrays);
+  if (data.length === 0) {
+    return NextResponse.json({ error: "empty_prediction_series" }, { status: 422 });
+  }
+
+  const startIdx = Math.max(0, startDay * 24);
+  const endIdxExclusive =
+    endDay >= 9999 ? data.length : Math.min(data.length, (endDay + 1) * 24);
+  data = data.slice(startIdx, endIdxExclusive);
+
+  return NextResponse.json({
+    experiment,
+    model,
+    run,
+    totalDays,
+    startDay,
+    endDay,
+    keys,
+    data,
+  });
 }
