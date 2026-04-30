@@ -16,7 +16,7 @@ import {
   METRIC_LABELS,
   KEY_METRICS,
   MODEL_COLORS,
-  EXPERIMENT_NOTEBOOK_MAP,
+  getExperimentNotebookBadge,
 } from "@/lib/types";
 import MethodologySection from "./MethodologySection";
 import { ExportableChart } from "./ExportableChart";
@@ -209,7 +209,7 @@ export default function BestModelsLanding({ onCompareInDashboard }: BestModelsLa
                 </thead>
                 <tbody>
                   {top10Models.map((m, i) => {
-                    const notebook = EXPERIMENT_NOTEBOOK_MAP[m.experiment];
+                    const notebookBadge = getExperimentNotebookBadge(m.experiment);
                     return (
                       <tr key={`${m.experiment}/${m.model}`} className="border-b border-zinc-100">
                         <td className="py-2 px-4 font-medium text-zinc-500 text-xs">{m.rank}</td>
@@ -217,9 +217,9 @@ export default function BestModelsLanding({ onCompareInDashboard }: BestModelsLa
                           <span className="truncate block max-w-[180px]" title={m.modelDisplayName}>
                             {m.modelDisplayName.replace(/_/g, " ")}
                           </span>
-                          {notebook != null && (
+                          {notebookBadge != null && (
                             <span className="text-zinc-400 text-xs font-normal block">
-                              Notebook {notebook}
+                              Notebook {notebookBadge}
                             </span>
                           )}
                         </td>
@@ -285,7 +285,7 @@ export default function BestModelsLanding({ onCompareInDashboard }: BestModelsLa
       {/* Rank cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {top5Models.map((m, i) => {
-          const notebook = EXPERIMENT_NOTEBOOK_MAP[m.experiment];
+          const notebookBadge = getExperimentNotebookBadge(m.experiment);
           return (
             <div
               key={`${m.experiment}/${m.model}`}
@@ -299,7 +299,7 @@ export default function BestModelsLanding({ onCompareInDashboard }: BestModelsLa
                   #{m.rank}
                 </span>
                 <span className="text-xs text-zinc-500">
-                  {notebook != null ? `Notebook ${notebook}` : m.experimentDisplayName}
+                  {notebookBadge != null ? `Notebook ${notebookBadge}` : m.experimentDisplayName}
                 </span>
               </div>
               <h3 className="font-medium text-zinc-900 text-sm truncate" title={m.modelDisplayName}>

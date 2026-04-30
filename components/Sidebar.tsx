@@ -2,7 +2,11 @@
 
 import { useEffect, useState, useMemo } from "react";
 import type { Experiment, SelectedModel } from "@/lib/types";
-import { MODEL_COLORS, EXPERIMENT_NOTEBOOK_MAP } from "@/lib/types";
+import {
+  MODEL_COLORS,
+  compareExperimentsByNotebook,
+  getExperimentNotebookBadge,
+} from "@/lib/types";
 
 interface SidebarProps {
   selectedModels: SelectedModel[];
@@ -34,9 +38,9 @@ export default function Sidebar({
 
   const sortedExperiments = useMemo(() => {
     return [...experiments].sort((a, b) => {
-      const na = EXPERIMENT_NOTEBOOK_MAP[a.name] ?? 999;
-      const nb = EXPERIMENT_NOTEBOOK_MAP[b.name] ?? 999;
-      return na - nb;
+      const c = compareExperimentsByNotebook(a.name, b.name);
+      if (c !== 0) return c;
+      return a.displayName.localeCompare(b.displayName);
     });
   }, [experiments]);
 
@@ -105,10 +109,12 @@ export default function Sidebar({
           <div className="text-xs text-zinc-400 p-3 text-center">No experiments found</div>
         ) : (
           sortedExperiments.map((exp) => {
-            const notebook = EXPERIMENT_NOTEBOOK_MAP[exp.name];
+            const notebookBadge = getExperimentNotebookBadge(exp.name);
             return (
               <div key={exp.name}>
                 <button
+                  type="button"
+                  title={exp.name}
                   onClick={() => setExpandedExp(expandedExp === exp.name ? null : exp.name)}
                   className="w-full text-left px-2.5 py-2 rounded-md text-xs font-medium text-zinc-700 hover:bg-zinc-50 transition-colors flex items-center gap-2"
                 >
@@ -121,9 +127,9 @@ export default function Sidebar({
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                   </svg>
-                  {notebook != null && (
-                    <span className="shrink-0 w-5 h-5 rounded bg-zinc-100 text-zinc-500 flex items-center justify-center text-[10px] font-semibold">
-                      {notebook}
+                  {notebookBadge != null && (
+                    <span className="shrink-0 min-h-5 min-w-5 max-w-[3.25rem] rounded bg-zinc-100 text-zinc-500 flex items-center justify-center px-0.5 text-[9px] font-semibold leading-tight tabular-nums">
+                      {notebookBadge}
                     </span>
                   )}
                   <span className="truncate">{exp.displayName}</span>
@@ -207,7 +213,7 @@ export default function Sidebar({
           </div>
           <div className="space-y-1">
             {selectedModels.map((m) => {
-              const notebook = EXPERIMENT_NOTEBOOK_MAP[m.experiment];
+              const notebookBadge = getExperimentNotebookBadge(m.experiment);
               return (
                 <div
                   key={`${m.experiment}/${m.model}`}
@@ -219,7 +225,9 @@ export default function Sidebar({
                   />
                   <span className="truncate">{formatModelName(m.model)}</span>
                   <span className="text-zinc-400 ml-auto shrink-0 flex items-center gap-1">
-                    {notebook != null && <span className="text-zinc-300">N{notebook}</span>}
+                    {notebookBadge != null && (
+                      <span className="text-zinc-300 tabular-nums">{notebookBadge}</span>
+                    )}
                     <span>{m.run === "average" ? "avg" : `#${m.run}`}</span>
                   </span>
                 </div>
