@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
-import { spawnSync } from "child_process";
+import { spawnSync, type SpawnSyncReturns } from "child_process";
 import {
   getPredictionsPath,
   listRunsWithPredictions,
@@ -32,7 +32,7 @@ function runNpzMerge(
   if (!fs.existsSync(script)) {
     return { ok: false, error: "bundle_script_missing", detail: script };
   }
-  let r: ReturnType<typeof spawnSync> | null = null;
+  let r: SpawnSyncReturns<string> | null = null;
   const tried: string[] = [];
   for (const bin of pythonCandidates()) {
     tried.push(bin);
