@@ -5,6 +5,32 @@ import { METRIC_LABELS } from "./types";
 
 const RESULTS_DIR = process.env.RESULTS_DIR || path.resolve(process.cwd(), "../results");
 
+/**
+ * Result directories produced by the 13 refactored notebooks (Nb01–Nb13).
+ * Anything under `results/` not in this set (legacy notebooks under
+ * `notebooks/legacy/`) is hidden from the visualization UI.
+ */
+const ALLOWED_EXPERIMENTS: ReadonlySet<string> = new Set([
+  "dropout_model_size",                 // Nb03
+  "feature_ablation_prices_vs_full",    // Nb07
+  "feature_selection_rolling",          // Nb07
+  "final_model",                        // Nb12
+  "head_study_torch",                   // Nb02
+  "keras_pytorch_jsu_10run",            // Nb11
+  "lear_informed_transformer",          // Nb13
+  "lear_transformer_residual_rolling",  // Nb06, Nb12
+  "preprocessing_study_online_rolling", // Nb05
+  "probabilistic_lear_baseline",        // Nb06
+  "rolling_evaluation",                 // Nb04
+  "rolling_quickstart",                 // Nb12, Nb13
+  "rolling_quickstart_pit",             // Nb12
+  "rolling_recalibration",              // Nb04, Nb10
+  "sequential_conformal",               // Nb10
+  "train_val_test_window_study",        // Nb11
+  "unified_best_config_cascade",        // Nb08
+  "val_split_trick",                    // Nb11
+]);
+
 /** Test window start; keep in sync with `scripts/npz_predictions_bundle.py` comment. */
 export const PREDICTION_CHART_TEST_START = new Date("2025-08-08T00:00:00Z");
 
@@ -100,6 +126,7 @@ export function listExperiments(): Experiment[] {
   const experiments: Experiment[] = [];
 
   for (const entry of entries) {
+    if (!ALLOWED_EXPERIMENTS.has(entry)) continue;
     const dirPath = path.join(RESULTS_DIR, entry);
     if (!isExperimentDir(dirPath)) continue;
 
