@@ -8,8 +8,20 @@ import {
 } from "@/lib/results";
 import { buildPredictionDataFromMergedArrays } from "@/lib/build-prediction-points";
 
-function pythonBinary(): string {
-  return process.env.PYTHON_BIN || "python3";
+function pythonCandidates(): string[] {
+  const home = process.env.HOME || "";
+  const candidates = [
+    process.env.PYTHON_BIN,
+    "python3",
+    "python",
+    home && `${home}/miniforge3/bin/python3`,
+    home && `${home}/miniconda3/bin/python3`,
+    home && `${home}/anaconda3/bin/python3`,
+    "/opt/homebrew/bin/python3",
+    "/usr/local/bin/python3",
+    "/usr/bin/python3",
+  ].filter((v): v is string => Boolean(v));
+  return Array.from(new Set(candidates));
 }
 
 function runNpzMerge(
@@ -20,13 +32,23 @@ function runNpzMerge(
   if (!fs.existsSync(script)) {
     return { ok: false, error: "bundle_script_missing", detail: script };
   }
-  const r = spawnSync(pythonBinary(), [script, ...npzPaths], {
-    encoding: "utf-8",
-    maxBuffer: 512 * 1024 * 1024,
-    windowsHide: true,
-  });
-  if (r.error) {
-    return { ok: false, error: "python_spawn_failed", detail: String(r.error) };
+  let r: ReturnType<typeof spawnSync> | null = null;
+  const tried: string[] = [];
+  for (const bin of pythonCandidates()) {
+    tried.push(bin);
+    r = spawnSync(bin, [script, ...npzPaths], {
+      encoding: "utf-8",
+      maxBuffer: 512 * 1024 * 1024,
+      windowsHide: true,
+    });
+    if (!r.error) break;
+  }
+  if (!r || r.error) {
+    return {
+      ok: false,
+      error: "python_spawn_failed",
+      detail: `tried: ${tried.join(", ")}; last error: ${r?.error ? String(r.error) : "none"}`,
+    };
   }
   const out = (r.stdout || "").trim();
   if (!out) {
