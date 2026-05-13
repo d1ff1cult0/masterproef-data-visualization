@@ -16,10 +16,14 @@ const ALLOWED_EXPERIMENTS: ReadonlySet<string> = new Set([
   "feature_selection_rolling",          // Nb07
   "final_model",                        // Nb12
   "head_study_torch",                   // Nb02
+  "hybrid_comparison",                  // Nb07
   "keras_pytorch_jsu_10run",            // Nb11
   "lear_informed_transformer",          // Nb13
   "lear_transformer_residual_rolling",  // Nb06, Nb12
+  "moe_comparison",                     // Nb09
+  "preprocessing_study",                // Nb05
   "preprocessing_study_online_rolling", // Nb05
+  "price_floor_comparison",             // Nb08
   "probabilistic_lear_baseline",        // Nb06
   "rolling_evaluation",                 // Nb04
   "rolling_quickstart",                 // Nb12, Nb13
