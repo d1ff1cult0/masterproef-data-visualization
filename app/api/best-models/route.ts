@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getBestModels } from "@/lib/results";
+import { getBestModels, getResultsDir } from "@/lib/results";
 import { METRIC_LABELS } from "@/lib/types";
 
 const VALID_METRICS = new Set(Object.keys(METRIC_LABELS));
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const models = getBestModels(n, metric);
-    return NextResponse.json({ models, metric });
+    return NextResponse.json({ models, metric, resultsDir: getResultsDir() });
   } catch (error) {
     return NextResponse.json(
       { error: `Failed to get best models: ${error}` },

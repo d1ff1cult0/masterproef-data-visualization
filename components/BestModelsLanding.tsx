@@ -94,6 +94,7 @@ export default function BestModelsLanding({ onCompareInDashboard }: BestModelsLa
   const [selectedMetric, setSelectedMetric] = useState<string>("MAE");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [resultsDir, setResultsDir] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -101,6 +102,7 @@ export default function BestModelsLanding({ onCompareInDashboard }: BestModelsLa
       .then((r) => r.json())
       .then((data) => {
         setModels(data.models ?? []);
+        setResultsDir(data.resultsDir ?? null);
         setError(null);
       })
       .catch((err) => {
@@ -275,8 +277,10 @@ export default function BestModelsLanding({ onCompareInDashboard }: BestModelsLa
 
       {!hasRankedModels && (
         <div className="rounded-lg border border-zinc-200 bg-white px-4 py-6 text-sm text-zinc-600">
-          No ranked model summaries were found for the active `Nb` notebook result folders. The dashboard only scans
-          result directories produced by `notebooks/Nb*.ipynb`, so legacy-only outputs are intentionally ignored.
+          No ranked model summaries were found in the configured results directory
+          {resultsDir ? ` (${resultsDir})` : ""}. The dashboard now falls back to every valid run directory under
+          that path, so this usually means the running server process is still pointed at the wrong results folder or
+          needs to be rebuilt/restarted.
         </div>
       )}
 

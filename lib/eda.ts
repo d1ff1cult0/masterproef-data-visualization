@@ -1,4 +1,5 @@
 import fs from "fs";
+import path from "path";
 
 // ──────────────────── Types ────────────────────
 
@@ -456,10 +457,24 @@ const NUMERIC_COLUMNS = [
 
 let cachedResult: EDAResult | null = null;
 
+function firstExistingPath(candidates: string[]): string {
+  return candidates.find((candidate) => fs.existsSync(candidate)) ?? candidates[0];
+}
+
+function resolveDatasetPath(): string {
+  if (process.env.DATASET_PATH) return process.env.DATASET_PATH;
+  const home = process.env.HOME || "";
+  return firstExistingPath([
+    path.resolve(process.cwd(), "../data/datasets/BE_ENTSOE.csv"),
+    path.resolve(process.cwd(), "../../masterproef_new/data/datasets/BE_ENTSOE.csv"),
+    home ? path.join(home, "masterproef_new/data/datasets/BE_ENTSOE.csv") : "",
+  ].filter(Boolean));
+}
+
 export function computeEDA(): EDAResult {
   if (cachedResult) return cachedResult;
 
-  const datasetPath = process.env.DATASET_PATH!;
+  const datasetPath = resolveDatasetPath();
   const { headers, rows } = parseCSV(datasetPath);
   const n = rows.length;
 
@@ -902,7 +917,7 @@ let cachedPriceTimeline: { date: string; price: number }[] | null = null;
  */
 export function getPriceTimeline(): { date: string; price: number }[] {
   if (cachedPriceTimeline) return cachedPriceTimeline;
-  const datasetPath = process.env.DATASET_PATH!;
+  const datasetPath = resolveDatasetPath();
   const { rows } = parseCSV(datasetPath);
   const dailyGroups = groupBy(rows, (r) => r.Date.slice(0, 10));
   const dailyEntries = [...dailyGroups.entries()].sort((a, b) => a[0].localeCompare(b[0]));

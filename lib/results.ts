@@ -24,6 +24,13 @@ const ALLOWED_EXPERIMENTS: ReadonlySet<string> = new Set(ACTIVE_EXPERIMENT_NAMES
 
 const VIRTUAL_GRID_SEARCH_EXPERIMENT = "transformer_grid_search";
 const GRID_MODEL_PATTERN = /^grid_[0-9a-f]+$/i;
+const IGNORED_RESULT_DIRS: ReadonlySet<string> = new Set([
+  "__pycache__",
+  "_cache",
+  "_lear_cache",
+  "figures",
+  "state",
+]);
 
 /** Test window start; keep in sync with `scripts/npz_predictions_bundle.py` comment. */
 export const PREDICTION_CHART_TEST_START = new Date("2025-08-08T00:00:00Z");
@@ -147,7 +154,33 @@ function listVirtualGridSearchExperiment(entries: string[]): Experiment | null {
   };
 }
 
-export function listExperiments(): Experiment[] {
+function shouldScanUnmappedEntry(entry: string): boolean {
+  if (entry.startsWith(".")) return false;
+  if (IGNORED_RESULT_DIRS.has(entry)) return false;
+  if (GRID_MODEL_PATTERN.test(entry)) return false;
+  return true;
+}
+
+function createExperimentFromEntry(entry: string): Experiment | null {
+  const dirPath = path.join(RESULTS_DIR, entry);
+  if (!isExperimentDir(dirPath)) return null;
+
+  const models: ModelInfo[] = [];
+  for (const rel of findModelRelativePaths(dirPath)) {
+    const modelInfo = getModelInfo(dirPath, rel);
+    if (modelInfo) models.push(modelInfo);
+  }
+
+  if (models.length === 0) return null;
+  return {
+    name: entry,
+    displayName: displayNameForExperiment(entry),
+    models,
+    hasResults: fs.existsSync(path.join(dirPath, "results.json")),
+  };
+}
+
+export function listExperiments(options: { includeUnmapped?: boolean } = {}): Experiment[] {
   if (!fs.existsSync(RESULTS_DIR)) return [];
 
   const entries = fs.readdirSync(RESULTS_DIR);
@@ -159,23 +192,18 @@ export function listExperiments(): Experiment[] {
   for (const entry of entries) {
     if (!ALLOWED_EXPERIMENTS.has(entry)) continue;
     if (entry === VIRTUAL_GRID_SEARCH_EXPERIMENT) continue;
-    const dirPath = path.join(RESULTS_DIR, entry);
-    if (!isExperimentDir(dirPath)) continue;
+    const experiment = createExperimentFromEntry(entry);
+    if (experiment) experiments.push(experiment);
+  }
 
-    const models: ModelInfo[] = [];
-
-    for (const rel of findModelRelativePaths(dirPath)) {
-      const modelInfo = getModelInfo(dirPath, rel);
-      if (modelInfo) models.push(modelInfo);
-    }
-
-    if (models.length > 0) {
-      experiments.push({
-        name: entry,
-        displayName: displayNameForExperiment(entry),
-        models,
-        hasResults: fs.existsSync(path.join(dirPath, "results.json")),
-      });
+  if (options.includeUnmapped) {
+    const known = new Set(experiments.map((exp) => exp.name));
+    for (const entry of entries) {
+      if (known.has(entry)) continue;
+      if (ALLOWED_EXPERIMENTS.has(entry)) continue;
+      if (!shouldScanUnmappedEntry(entry)) continue;
+      const experiment = createExperimentFromEntry(entry);
+      if (experiment) experiments.push(experiment);
     }
   }
 
@@ -286,11 +314,31 @@ export function getBestModels(
   n: number = 5,
   metric: string = "MAE"
 ): BestModelEntry[] {
-  const experiments = listExperiments();
-  const candidates: { entry: Omit<BestModelEntry, "rank">; value: number }[] = [];
+  let experiments = listExperiments();
+  let candidates = collectBestModelCandidates(experiments, metric);
+
+  if (candidates.length === 0) {
+    experiments = listExperiments({ includeUnmapped: true });
+    candidates = collectBestModelCandidates(experiments, metric);
+  }
 
   const meta = METRIC_LABELS[metric];
   const lowerBetter = meta?.lowerBetter ?? true;
+
+  candidates.sort((a, b) =>
+    lowerBetter ? a.value - b.value : b.value - a.value
+  );
+  return candidates.slice(0, n).map((c, i) => ({
+    ...c.entry,
+    rank: i + 1,
+  }));
+}
+
+function collectBestModelCandidates(
+  experiments: Experiment[],
+  metric: string
+): { entry: Omit<BestModelEntry, "rank">; value: number }[] {
+  const candidates: { entry: Omit<BestModelEntry, "rank">; value: number }[] = [];
 
   for (const exp of experiments) {
     for (const modelInfo of exp.models) {
@@ -314,11 +362,5 @@ export function getBestModels(
     }
   }
 
-  candidates.sort((a, b) =>
-    lowerBetter ? a.value - b.value : b.value - a.value
-  );
-  return candidates.slice(0, n).map((c, i) => ({
-    ...c.entry,
-    rank: i + 1,
-  }));
+  return candidates;
 }
