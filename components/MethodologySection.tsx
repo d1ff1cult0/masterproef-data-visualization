@@ -80,7 +80,7 @@ export default function MethodologySection() {
       <div className="prose prose-sm max-w-none text-zinc-700 space-y-4">
         <p>
           All experiments follow a unified pipeline. Model hyperparameters were
-          optimized beforehand via a grid search (Notebook 2) and are kept
+          optimized beforehand via a grid search (Nb03) and are kept
           fixed across subsequent studies. Each configuration is run multiple
           times ({trainingConfig.n_runs} runs) to account for statistical
           variability; reported metrics are the mean ± standard deviation across

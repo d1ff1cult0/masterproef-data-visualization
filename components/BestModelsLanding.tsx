@@ -148,18 +148,9 @@ export default function BestModelsLanding({ onCompareInDashboard }: BestModelsLa
     );
   }
 
-  if (models.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
-        <p className="text-sm text-zinc-600">No model results found on disk.</p>
-        <p className="text-xs text-zinc-500">
-          Run experiments first, then the best 5 models will appear here.
-        </p>
-      </div>
-    );
-  }
+  const hasRankedModels = models.length > 0;
 
-  const barDataByMetric = KEY_METRICS.map((metric) => {
+  const barDataByMetric = hasRankedModels ? KEY_METRICS.map((metric) => {
     const meta = METRIC_LABELS[metric];
     const values = top5Models.map((m) => getValue(m, metric));
     const validValues = values.filter((v): v is number => v != null);
@@ -181,7 +172,7 @@ export default function BestModelsLanding({ onCompareInDashboard }: BestModelsLa
         isBest: (getValue(m, metric) ?? NaN) === best && validValues.length > 0,
       })),
     };
-  });
+  }) : [];
 
   return (
     <div className="p-6 space-y-8 max-w-full">
@@ -208,7 +199,7 @@ export default function BestModelsLanding({ onCompareInDashboard }: BestModelsLa
                   </tr>
                 </thead>
                 <tbody>
-                  {top10Models.map((m, i) => {
+                  {top10Models.map((m) => {
                     const notebookBadge = getExperimentNotebookBadge(m.experiment);
                     return (
                       <tr key={`${m.experiment}/${m.model}`} className="border-b border-zinc-100">
@@ -282,7 +273,15 @@ export default function BestModelsLanding({ onCompareInDashboard }: BestModelsLa
           </div>
         </div>
 
+      {!hasRankedModels && (
+        <div className="rounded-lg border border-zinc-200 bg-white px-4 py-6 text-sm text-zinc-600">
+          No ranked model summaries were found for the active `Nb` notebook result folders. The dashboard only scans
+          result directories produced by `notebooks/Nb*.ipynb`, so legacy-only outputs are intentionally ignored.
+        </div>
+      )}
+
       {/* Rank cards */}
+      {hasRankedModels && (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {top5Models.map((m, i) => {
           const notebookBadge = getExperimentNotebookBadge(m.experiment);
@@ -325,8 +324,10 @@ export default function BestModelsLanding({ onCompareInDashboard }: BestModelsLa
           );
         })}
       </div>
+      )}
 
       {/* Bar charts for key metrics */}
+      {hasRankedModels && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {barDataByMetric.map(({ metric, label, data }) => (
           <ExportableChart key={metric} title={label} filename={`best-models-${metric}`}>
@@ -380,8 +381,10 @@ export default function BestModelsLanding({ onCompareInDashboard }: BestModelsLa
           </ExportableChart>
         ))}
       </div>
+      )}
 
       {/* Full metrics table */}
+      {hasRankedModels && (
       <div className="border border-zinc-200 rounded-lg overflow-hidden bg-white">
         <div className="px-4 py-3 bg-zinc-50 border-b border-zinc-200">
           <h3 className="text-sm font-medium text-zinc-700">
@@ -463,9 +466,10 @@ export default function BestModelsLanding({ onCompareInDashboard }: BestModelsLa
           </table>
         </div>
       </div>
+      )}
 
       {/* Per-run breakdown for models with multiple runs */}
-      {top5Models.some((m) => m.runs.length > 1) && (
+      {hasRankedModels && top5Models.some((m) => m.runs.length > 1) && (
         <div className="border border-zinc-200 rounded-lg p-4 bg-white">
           <h3 className="text-sm font-medium text-zinc-700 mb-3">
             Per-Run Breakdown

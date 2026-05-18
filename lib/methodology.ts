@@ -25,7 +25,7 @@ export const METHODOLOGY = {
     outputHorizonDescription: "24 hours (1 day)",
   },
   modelConfig: {
-    description: "Optimized via grid search (Notebook 2)",
+    description: "Optimized via grid search (Nb03)",
     d_model: 224,
     num_heads: 7,
     num_layers: 3,

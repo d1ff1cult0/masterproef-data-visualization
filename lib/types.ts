@@ -103,91 +103,142 @@ export const MODEL_COLORS = [
 export const KEY_METRICS = ["MAE", "RMSE", "CRPS", "R2", "PICP", "IntervalScore"];
 
 /**
- * Maps results folder names under `results/` to thesis notebook numbers for sorting and default badges.
- * Add new folders here when notebooks write new top-level result directories.
- * `v2_vs_v21_comparison` is mapped to 39 as a placeholder until it matches a numbered notebook in the repo.
+ * Top-level result folders produced or consumed by the active notebooks in
+ * `notebooks/Nb*.ipynb`. This is also the dashboard allowlist; folders only
+ * referenced by `notebooks/legacy/` should not appear in the sidebar.
  */
 export const EXPERIMENT_NOTEBOOK_MAP: Record<string, number> = {
-  transformer_grid_search: 2,
-  lag_study: 3,
+  head_study_torch: 2,
+
+  transformer_grid_search: 3,
   window_length_study: 3,
-  head_study: 4,
-  head_study_torch: 4,
-  head_study_torch_rolling: 4,
-  preprocessing_study: 5,
+  transformer_optimization: 3,
+  dropout_model_size: 3,
+  arch_optimization_rolling: 3,
+
+  rolling_evaluation: 4,
+  rolling_recalibration: 4,
+
   preprocessing_study_online_rolling: 5,
-  benchmark: 6,
-  hybrid_comparison: 7,
-  price_floor_comparison: 8,
+
+  probabilistic_lear_baseline: 6,
+  lear_transformer_residual_rolling: 6,
+
+  dataset_v1_vs_v2: 7,
+  feature_selection_v2: 7,
+  feature_selection_rolling: 7,
+  feature_ablation_prices_vs_full: 7,
+
+  directions_210: 8,
+  lear_transformer_ensemble: 8,
+  closing_the_gap: 8,
+  unified_best_config_cascade: 8,
+
+  benchmark: 9,
+  hybrid_comparison: 9,
   moe_comparison: 9,
-  directions_210: 10,
-  rolling_evaluation: 11,
-  levy_processes_study: 12,
-  encoder_decoder_test: 13,
-  "13_improved_transformer": 13,
-  keras_pytorch_jsu_10run: 14,
-  train_val_test_window_study: 15,
-  train_val_test_window_study_lear: 16,
-  lear_transformer_ensemble: 17,
-  rolling_recalibration: 19,
-  probabilistic_lear_baseline: 20,
-  lear_feature_transformer: 21,
-  patchtst: 22,
-  sequential_conformal: 23,
-  dataset_v1_vs_v2: 24,
-  v2_vs_v21_comparison: 39,
-  transformer_optimization: 25,
-  feature_selection_v2: 26,
-  feature_selection_rolling: 33,
-  arch_optimization_rolling: 34,
-  closing_the_gap: 27,
-  final_model: 28,
-  val_split_trick: 29,
-  dropout_model_size: 30,
-  rolling_quickstart: 32,
-  rolling_quickstart_pit: 32,
-  rolling_pit: 32,
-  rolling_pit_full: 32,
-  lear_transformer_residual_rolling: 35,
-  hybrid_sde_rolling: 36,
-  unified_best_config_cascade: 37,
-  feature_ablation_prices_vs_full: 38,
+  levy_processes_study: 9,
+  hybrid_sde_rolling: 9,
+
+  sequential_conformal: 10,
+
+  keras_pytorch_jsu_10run: 11,
+  train_val_test_window_study: 11,
+  val_split_trick: 11,
+
+  rolling_quickstart: 12,
+  rolling_quickstart_pit: 12,
+  final_model: 12,
+
+  lear_informed_transformer: 13,
+  reported_results: 14,
+  perhour_conformal: 15,
+  ensemble_probabilistic: 16,
+  rolling_transformer_differencing_jsu_param_average: 17,
 };
 
-/**
- * Notebook 32 writes several top-level result roots (different cells). Same sort key (32), distinct badges.
- * Order here is sidebar order among notebook-32 experiments.
- */
-const ROLLING_NOTEBOOK_32_ORDER: string[] = [
-  "rolling_quickstart",
-  "rolling_quickstart_pit",
-  "rolling_pit",
-  "rolling_pit_full",
-];
+export const ACTIVE_EXPERIMENT_NAMES = Object.keys(EXPERIMENT_NOTEBOOK_MAP);
 
-/** Overrides numeric badge when one notebook maps to several result folders (see ROLLING_NOTEBOOK_32_ORDER). */
+const EXPERIMENT_TIE_ORDER: Record<string, number> = {
+  head_study_torch: 1,
+
+  transformer_grid_search: 1,
+  window_length_study: 2,
+  transformer_optimization: 3,
+  dropout_model_size: 4,
+  arch_optimization_rolling: 5,
+
+  rolling_evaluation: 1,
+  rolling_recalibration: 2,
+
+  probabilistic_lear_baseline: 1,
+  lear_transformer_residual_rolling: 2,
+
+  dataset_v1_vs_v2: 1,
+  feature_selection_v2: 2,
+  feature_selection_rolling: 3,
+  feature_ablation_prices_vs_full: 4,
+
+  directions_210: 1,
+  lear_transformer_ensemble: 2,
+  closing_the_gap: 3,
+  unified_best_config_cascade: 4,
+
+  benchmark: 1,
+  hybrid_comparison: 2,
+  moe_comparison: 3,
+  levy_processes_study: 4,
+  hybrid_sde_rolling: 5,
+
+  keras_pytorch_jsu_10run: 1,
+  train_val_test_window_study: 2,
+  val_split_trick: 3,
+
+  rolling_quickstart: 1,
+  rolling_quickstart_pit: 2,
+  final_model: 3,
+};
+
+/** Overrides numeric badge when one notebook maps to several result folders. */
 export const EXPERIMENT_NOTEBOOK_BADGE: Partial<Record<string, string>> = {
-  rolling_quickstart: "32·1",
-  rolling_quickstart_pit: "32·2",
-  rolling_pit: "32·2b",
-  rolling_pit_full: "32·3",
+  transformer_grid_search: "3·1",
+  window_length_study: "3·2",
+  transformer_optimization: "3·3",
+  dropout_model_size: "3·4",
+  arch_optimization_rolling: "3·5",
+  rolling_evaluation: "4·1",
+  rolling_recalibration: "4·2",
+  probabilistic_lear_baseline: "6·1",
+  lear_transformer_residual_rolling: "6·2",
+  dataset_v1_vs_v2: "7·1",
+  feature_selection_v2: "7·2",
+  feature_selection_rolling: "7·3",
+  feature_ablation_prices_vs_full: "7·4",
+  directions_210: "8·1",
+  lear_transformer_ensemble: "8·2",
+  closing_the_gap: "8·3",
+  unified_best_config_cascade: "8·4",
+  benchmark: "9·1",
+  hybrid_comparison: "9·2",
+  moe_comparison: "9·3",
+  levy_processes_study: "9·4",
+  hybrid_sde_rolling: "9·5",
+  keras_pytorch_jsu_10run: "11·1",
+  train_val_test_window_study: "11·2",
+  val_split_trick: "11·3",
+  rolling_quickstart: "12·1",
+  rolling_quickstart_pit: "12·2",
+  final_model: "12·3",
 };
 
-function notebook32TieIndex(experimentName: string): number {
-  const i = ROLLING_NOTEBOOK_32_ORDER.indexOf(experimentName);
-  return i === -1 ? 999 : i;
-}
-
-/** Sort key: primary notebook number, then tie-break (e.g. notebook 32 variants). */
+/** Sort key: primary notebook number, then the active-notebook folder order. */
 export function compareExperimentsByNotebook(aName: string, bName: string): number {
   const na = EXPERIMENT_NOTEBOOK_MAP[aName] ?? 999;
   const nb = EXPERIMENT_NOTEBOOK_MAP[bName] ?? 999;
   if (na !== nb) return na - nb;
-  if (na === 32) {
-    const ta = notebook32TieIndex(aName);
-    const tb = notebook32TieIndex(bName);
-    if (ta !== tb) return ta - tb;
-  }
+  const ta = EXPERIMENT_TIE_ORDER[aName] ?? 999;
+  const tb = EXPERIMENT_TIE_ORDER[bName] ?? 999;
+  if (ta !== tb) return ta - tb;
   return aName.localeCompare(bName);
 }
 
