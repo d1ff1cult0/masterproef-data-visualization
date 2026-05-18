@@ -24,6 +24,7 @@ const ALLOWED_EXPERIMENTS: ReadonlySet<string> = new Set(ACTIVE_EXPERIMENT_NAMES
 
 const VIRTUAL_GRID_SEARCH_EXPERIMENT = "transformer_grid_search";
 const GRID_MODEL_PATTERN = /^grid_[0-9a-f]+$/i;
+const RUN_DIR_PATTERN = /^run_(\d+)$/;
 const IGNORED_RESULT_DIRS: ReadonlySet<string> = new Set([
   "__pycache__",
   "_cache",
@@ -129,6 +130,29 @@ function resolveModelDir(experiment: string, model: string): string {
     return path.join(RESULTS_DIR, model);
   }
   return path.join(RESULTS_DIR, experiment, model);
+}
+
+function getMetricFromRecord(
+  record: Record<string, unknown> | null | undefined,
+  metric: string
+): number | null {
+  if (!record) return null;
+  const direct = record[metric];
+  const directValue = toFiniteNumber(direct);
+  if (directValue != null) return directValue;
+
+  const lowerMetric = metric.toLowerCase();
+  const key = Object.keys(record).find((k) => k.toLowerCase() === lowerMetric);
+  return key ? toFiniteNumber(record[key]) : null;
+}
+
+function toFiniteNumber(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
 }
 
 function listVirtualGridSearchExperiment(entries: string[]): Experiment | null {
@@ -295,10 +319,12 @@ function getMetricValue(
   runs: RunMetrics[],
   metric: string
 ): number | null {
-  const avg = summary?.avg?.[metric];
-  if (avg != null && !Number.isNaN(avg)) return avg;
+  const avg = getMetricFromRecord(summary?.avg, metric);
+  if (avg != null) return avg;
   if (runs.length > 0) {
-    const vals = runs.map((r) => r[metric]).filter((v) => v != null && !Number.isNaN(v));
+    const vals = runs
+      .map((r) => getMetricFromRecord(r, metric))
+      .filter((v): v is number => v != null);
     return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
   }
   return null;
@@ -320,6 +346,9 @@ export function getBestModels(
   if (candidates.length === 0) {
     experiments = listExperiments({ includeUnmapped: true });
     candidates = collectBestModelCandidates(experiments, metric);
+  }
+  if (candidates.length === 0) {
+    candidates = collectBestModelCandidatesFromMetricFiles(metric);
   }
 
   const meta = METRIC_LABELS[metric];
@@ -363,4 +392,108 @@ function collectBestModelCandidates(
   }
 
   return candidates;
+}
+
+function collectBestModelCandidatesFromMetricFiles(
+  metric: string
+): { entry: Omit<BestModelEntry, "rank">; value: number }[] {
+  if (!fs.existsSync(RESULTS_DIR) || !fs.statSync(RESULTS_DIR).isDirectory()) return [];
+
+  const grouped = new Map<string, {
+    experiment: string;
+    model: string;
+    experimentDisplayName: string;
+    modelDisplayName: string;
+    runs: RunMetrics[];
+  }>();
+
+  function walk(absDir: string): void {
+    const entries = fs.readdirSync(absDir, { withFileTypes: true });
+    const metricsPath = path.join(absDir, "metrics.json");
+    const dirName = path.basename(absDir);
+    if (RUN_DIR_PATTERN.test(dirName) && fs.existsSync(metricsPath)) {
+      const parsed = parseModelPathFromRunDir(absDir);
+      if (!parsed) return;
+      try {
+        const metrics = JSON.parse(fs.readFileSync(metricsPath, "utf-8")) as RunMetrics;
+        const key = `${parsed.experiment}\u0000${parsed.model}`;
+        const existing = grouped.get(key);
+        if (existing) {
+          existing.runs.push(metrics);
+        } else {
+          grouped.set(key, {
+            ...parsed,
+            runs: [metrics],
+          });
+        }
+      } catch {
+        return;
+      }
+      return;
+    }
+
+    for (const ent of entries) {
+      if (!ent.isDirectory()) continue;
+      if (ent.name.startsWith(".") || IGNORED_RESULT_DIRS.has(ent.name)) continue;
+      walk(path.join(absDir, ent.name));
+    }
+  }
+
+  walk(RESULTS_DIR);
+
+  const candidates: { entry: Omit<BestModelEntry, "rank">; value: number }[] = [];
+  for (const item of grouped.values()) {
+    const value = getMetricValue(null, item.runs, metric);
+    if (value == null) continue;
+    candidates.push({
+      entry: {
+        experiment: item.experiment,
+        model: item.model,
+        experimentDisplayName: item.experimentDisplayName,
+        modelDisplayName: item.modelDisplayName,
+        mae: getMetricValue(null, item.runs, "MAE") ?? value,
+        summary: null,
+        runs: item.runs,
+      },
+      value,
+    });
+  }
+  return candidates;
+}
+
+function parseModelPathFromRunDir(runDir: string): {
+  experiment: string;
+  model: string;
+  experimentDisplayName: string;
+  modelDisplayName: string;
+} | null {
+  const rel = path.relative(RESULTS_DIR, runDir);
+  if (rel.startsWith("..")) return null;
+  const parts = rel.split(path.sep);
+  if (parts.length < 2) return null;
+  const runPart = parts.at(-1);
+  if (!runPart || !RUN_DIR_PATTERN.test(runPart)) return null;
+  const modelParts = parts.slice(0, -1);
+  if (modelParts.length === 1) {
+    const only = modelParts[0];
+    if (!GRID_MODEL_PATTERN.test(only)) return null;
+    return {
+      experiment: VIRTUAL_GRID_SEARCH_EXPERIMENT,
+      model: only,
+      experimentDisplayName: "Transformer Grid Search",
+      modelDisplayName: only.replace(/_/g, " "),
+    };
+  }
+
+  const [experiment, ...modelPartsOnly] = modelParts;
+  const model = modelPartsOnly.join("/");
+  return {
+    experiment,
+    model,
+    experimentDisplayName: displayNameForExperiment(experiment),
+    modelDisplayName: model
+      .split("/")
+      .map((seg) => seg.replace(/_/g, " ").replace(/\(([^)]+)\)/g, "($1)"))
+      .join(" / "),
+  };
 }
