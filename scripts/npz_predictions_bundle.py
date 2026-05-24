@@ -46,8 +46,7 @@ def main() -> None:
         print(json.dumps({"ok": False, "error": "empty_load"}))
         return
 
-    keys = sorted(set.intersection(*(set(d) for d in dicts)))
-    if "y_test" not in keys:
+    if not all("y_test" in d for d in dicts):
         print(json.dumps({"ok": False, "error": "missing_y_test"}))
         return
 
@@ -56,12 +55,22 @@ def main() -> None:
     for d in dicts:
         if d["y_test"].shape != ref_shape:
             continue
-        if not all(k in d and getattr(d[k], "shape", None) == ref_shape for k in keys):
-            continue
         compatible.append(d)
 
     if not compatible:
         print(json.dumps({"ok": False, "error": "shape_mismatch"}))
+        return
+
+    keys = ["y_test"]
+    common_keys = sorted(set.intersection(*(set(d) for d in compatible)))
+    for k in common_keys:
+        if k == "y_test":
+            continue
+        if all(getattr(d[k], "shape", None) == ref_shape for d in compatible):
+            keys.append(k)
+
+    if len(keys) == 1:
+        print(json.dumps({"ok": False, "error": "no_chart_arrays"}))
         return
 
     merged: dict[str, list] = {}
