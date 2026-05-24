@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import type { Experiment, ModelInfo, ModelSummary, RunMetrics } from "./types";
-import { ACTIVE_EXPERIMENT_NAMES } from "./types";
+import { NOTEBOOK_EXPERIMENT_GROUPS } from "./types";
 import { METRIC_LABELS } from "./types";
 
 function firstExistingPath(candidates: string[]): string {
@@ -20,7 +20,12 @@ function resolveResultsDir(): string {
 
 const RESULTS_DIR = resolveResultsDir();
 
-const ALLOWED_EXPERIMENTS: ReadonlySet<string> = new Set(ACTIVE_EXPERIMENT_NAMES);
+const NOTEBOOK_GROUP_BY_NAME = new Map(
+  NOTEBOOK_EXPERIMENT_GROUPS.map((group) => [group.name, group])
+);
+const ACTIVE_RESULT_FOLDERS: ReadonlySet<string> = new Set(
+  NOTEBOOK_EXPERIMENT_GROUPS.flatMap((group) => group.resultFolders)
+);
 
 const VIRTUAL_GRID_SEARCH_EXPERIMENT = "transformer_grid_search";
 const GRID_MODEL_PATTERN = /^grid_[0-9a-f]+$/i;
@@ -67,6 +72,15 @@ function dirContainsRunSubdirs(absDir: string): boolean {
   });
 }
 
+function isDirectModelDir(absDir: string): boolean {
+  if (!fs.existsSync(absDir) || !fs.statSync(absDir).isDirectory()) return false;
+  return (
+    fs.existsSync(path.join(absDir, "metrics.json")) ||
+    fs.existsSync(path.join(absDir, "predictions.npz")) ||
+    fs.existsSync(path.join(absDir, "predictions_acp_perhour.npz"))
+  );
+}
+
 /**
  * Model directories are leaves that directly contain run_* folders (e.g. lag_study/foo
  * or rolling_quickstart/rolling/baseline). Supports arbitrary nesting.
@@ -78,6 +92,10 @@ function findModelRelativePaths(experimentRoot: string): string[] {
     const abs = rel ? path.join(experimentRoot, rel) : experimentRoot;
     if (!fs.existsSync(abs) || !fs.statSync(abs).isDirectory()) return;
     if (dirContainsRunSubdirs(abs)) {
+      out.push(rel);
+      return;
+    }
+    if (rel && isDirectModelDir(abs)) {
       out.push(rel);
       return;
     }
@@ -100,12 +118,20 @@ function isExperimentDir(dirPath: string): boolean {
   return findModelRelativePaths(dirPath).length > 0;
 }
 
+function getRunCountForModelDir(modelPath: string): number {
+  if (!fs.existsSync(modelPath) || !fs.statSync(modelPath).isDirectory()) return 0;
+  const runDirs = fs
+    .readdirSync(modelPath)
+    .filter((e) => RUN_DIR_PATTERN.test(e) && fs.statSync(path.join(modelPath, e)).isDirectory());
+  if (runDirs.length > 0) return runDirs.length;
+  return isDirectModelDir(modelPath) ? 1 : 0;
+}
+
 function getModelInfo(experimentDir: string, relModelPath: string): ModelInfo | null {
   const modelPath = path.join(experimentDir, ...relModelPath.split("/"));
   if (!fs.existsSync(modelPath) || !fs.statSync(modelPath).isDirectory()) return null;
-  const entries = fs.readdirSync(modelPath);
-  const runDirs = entries.filter((e) => e.startsWith("run_") && fs.statSync(path.join(modelPath, e)).isDirectory());
-  if (runDirs.length === 0) return null;
+  const runs = getRunCountForModelDir(modelPath);
+  if (runs === 0) return null;
 
   const hasSummary = fs.existsSync(path.join(modelPath, "summary.json"));
   const displayName = relModelPath
@@ -116,7 +142,7 @@ function getModelInfo(experimentDir: string, relModelPath: string): ModelInfo | 
   return {
     name: relModelPath,
     displayName,
-    runs: runDirs.length,
+    runs,
     hasSummary,
   };
 }
@@ -126,6 +152,13 @@ function displayNameForExperiment(name: string): string {
 }
 
 function resolveModelDir(experiment: string, model: string): string {
+  if (NOTEBOOK_GROUP_BY_NAME.has(experiment)) {
+    const [folder, ...modelParts] = model.split("/");
+    if (folder === VIRTUAL_GRID_SEARCH_EXPERIMENT && modelParts.length === 1 && GRID_MODEL_PATTERN.test(modelParts[0])) {
+      return path.join(RESULTS_DIR, modelParts[0]);
+    }
+    return path.join(RESULTS_DIR, folder, ...modelParts);
+  }
   if (experiment === VIRTUAL_GRID_SEARCH_EXPERIMENT && GRID_MODEL_PATTERN.test(model)) {
     return path.join(RESULTS_DIR, model);
   }
@@ -156,8 +189,6 @@ function toFiniteNumber(value: unknown): number | null {
 }
 
 function listVirtualGridSearchExperiment(entries: string[]): Experiment | null {
-  if (!ALLOWED_EXPERIMENTS.has(VIRTUAL_GRID_SEARCH_EXPERIMENT)) return null;
-
   const models = entries
     .filter((entry) => GRID_MODEL_PATTERN.test(entry))
     .map((entry) => {
@@ -178,64 +209,66 @@ function listVirtualGridSearchExperiment(entries: string[]): Experiment | null {
   };
 }
 
-function shouldScanUnmappedEntry(entry: string): boolean {
-  if (entry.startsWith(".")) return false;
-  if (IGNORED_RESULT_DIRS.has(entry)) return false;
-  if (GRID_MODEL_PATTERN.test(entry)) return false;
-  return true;
+function prefixModelInfo(folder: string, model: ModelInfo, showFolder: boolean): ModelInfo {
+  return {
+    ...model,
+    name: `${folder}/${model.name}`,
+    displayName: showFolder
+      ? `${displayNameForExperiment(folder)} / ${model.displayName}`
+      : model.displayName,
+  };
 }
 
-function createExperimentFromEntry(entry: string): Experiment | null {
-  const dirPath = path.join(RESULTS_DIR, entry);
-  if (!isExperimentDir(dirPath)) return null;
+function listModelsForResultFolder(folder: string, showFolder: boolean): ModelInfo[] {
+  const entries = fs.existsSync(RESULTS_DIR) ? fs.readdirSync(RESULTS_DIR) : [];
 
-  const models: ModelInfo[] = [];
-  for (const rel of findModelRelativePaths(dirPath)) {
-    const modelInfo = getModelInfo(dirPath, rel);
-    if (modelInfo) models.push(modelInfo);
+  if (folder === VIRTUAL_GRID_SEARCH_EXPERIMENT) {
+    return (listVirtualGridSearchExperiment(entries)?.models ?? []).map((model) =>
+      prefixModelInfo(folder, model, showFolder)
+    );
   }
 
-  if (models.length === 0) return null;
+  const dirPath = path.join(RESULTS_DIR, folder);
+  if (!isExperimentDir(dirPath)) return [];
+
+  return findModelRelativePaths(dirPath)
+    .map((rel) => getModelInfo(dirPath, rel))
+    .filter((model): model is ModelInfo => model != null)
+    .map((model) => prefixModelInfo(folder, model, showFolder));
+}
+
+function createNotebookExperiment(group: (typeof NOTEBOOK_EXPERIMENT_GROUPS)[number]): Experiment {
+  const visibleFolders = group.resultFolders.filter((folder) => {
+    if (folder === VIRTUAL_GRID_SEARCH_EXPERIMENT) {
+      const entries = fs.existsSync(RESULTS_DIR) ? fs.readdirSync(RESULTS_DIR) : [];
+      return listVirtualGridSearchExperiment(entries) != null;
+    }
+    return isExperimentDir(path.join(RESULTS_DIR, folder));
+  });
+  const showFolder = visibleFolders.length > 1;
+  const models = group.resultFolders.flatMap((folder) => listModelsForResultFolder(folder, showFolder));
+
   return {
-    name: entry,
-    displayName: displayNameForExperiment(entry),
+    name: group.name,
+    displayName: group.displayName,
     models,
-    hasResults: fs.existsSync(path.join(dirPath, "results.json")),
+    hasResults: models.length > 0,
   };
 }
 
 export function listExperiments(options: { includeUnmapped?: boolean } = {}): Experiment[] {
-  if (!fs.existsSync(RESULTS_DIR)) return [];
-
-  const entries = fs.readdirSync(RESULTS_DIR);
-  const experiments: Experiment[] = [];
-
-  const gridSearch = listVirtualGridSearchExperiment(entries);
-  if (gridSearch) experiments.push(gridSearch);
-
-  for (const entry of entries) {
-    if (!ALLOWED_EXPERIMENTS.has(entry)) continue;
-    if (entry === VIRTUAL_GRID_SEARCH_EXPERIMENT) continue;
-    const experiment = createExperimentFromEntry(entry);
-    if (experiment) experiments.push(experiment);
-  }
-
-  if (options.includeUnmapped) {
-    const known = new Set(experiments.map((exp) => exp.name));
-    for (const entry of entries) {
-      if (known.has(entry)) continue;
-      if (ALLOWED_EXPERIMENTS.has(entry)) continue;
-      if (!shouldScanUnmappedEntry(entry)) continue;
-      const experiment = createExperimentFromEntry(entry);
-      if (experiment) experiments.push(experiment);
-    }
-  }
-
-  return experiments;
+  void options;
+  return NOTEBOOK_EXPERIMENT_GROUPS.map((group) => createNotebookExperiment(group));
 }
 
 export function readRunMetrics(experiment: string, model: string, runIdx: number): RunMetrics | null {
-  const metricsPath = path.join(resolveModelDir(experiment, model), `run_${runIdx}`, "metrics.json");
+  const modelDir = resolveModelDir(experiment, model);
+  const metricsPath = path.join(modelDir, `run_${runIdx}`, "metrics.json");
+  const directMetricsPath = path.join(modelDir, "metrics.json");
+  if (!fs.existsSync(metricsPath) && runIdx === 0 && fs.existsSync(directMetricsPath)) {
+    const raw = fs.readFileSync(directMetricsPath, "utf-8");
+    return JSON.parse(raw) as RunMetrics;
+  }
   if (!fs.existsSync(metricsPath)) return null;
   const raw = fs.readFileSync(metricsPath, "utf-8");
   return JSON.parse(raw) as RunMetrics;
@@ -244,6 +277,12 @@ export function readRunMetrics(experiment: string, model: string, runIdx: number
 export function readAllRunMetrics(experiment: string, model: string): RunMetrics[] {
   const modelDir = resolveModelDir(experiment, model);
   if (!fs.existsSync(modelDir)) return [];
+
+  const directMetricsPath = path.join(modelDir, "metrics.json");
+  if (fs.existsSync(directMetricsPath)) {
+    const raw = fs.readFileSync(directMetricsPath, "utf-8");
+    return [JSON.parse(raw) as RunMetrics];
+  }
 
   const entries = fs.readdirSync(modelDir);
   const runDirs = entries
@@ -273,7 +312,10 @@ export function readModelSummary(experiment: string, model: string): ModelSummar
 }
 
 export function getPredictionsPath(experiment: string, model: string, runIdx: number): string {
-  return path.join(resolveModelDir(experiment, model), `run_${runIdx}`, "predictions.npz");
+  const modelDir = resolveModelDir(experiment, model);
+  const directPredictionsPath = path.join(modelDir, "predictions.npz");
+  if (runIdx === 0 && fs.existsSync(directPredictionsPath)) return directPredictionsPath;
+  return path.join(modelDir, `run_${runIdx}`, "predictions.npz");
 }
 
 /** Absolute directory for a model path (may contain `/`, e.g. `rolling/online_daily`). */
@@ -285,6 +327,7 @@ export function getModelResultsDir(experiment: string, model: string): string {
 export function listRunsWithPredictions(experiment: string, model: string): number[] {
   const modelDir = getModelResultsDir(experiment, model);
   if (!fs.existsSync(modelDir) || !fs.statSync(modelDir).isDirectory()) return [];
+  if (fs.existsSync(path.join(modelDir, "predictions.npz"))) return [0];
   const out: number[] = [];
   for (const ent of fs.readdirSync(modelDir)) {
     if (!ent.startsWith("run_")) continue;
@@ -299,8 +342,7 @@ export function listRunsWithPredictions(experiment: string, model: string): numb
 
 export function getRunCount(experiment: string, model: string): number {
   const modelDir = resolveModelDir(experiment, model);
-  if (!fs.existsSync(modelDir)) return 0;
-  return fs.readdirSync(modelDir).filter((e) => e.startsWith("run_")).length;
+  return getRunCountForModelDir(modelDir);
 }
 
 export interface BestModelEntry {
@@ -340,13 +382,9 @@ export function getBestModels(
   n: number = 5,
   metric: string = "MAE"
 ): BestModelEntry[] {
-  let experiments = listExperiments();
+  const experiments = listExperiments();
   let candidates = collectBestModelCandidates(experiments, metric);
 
-  if (candidates.length === 0) {
-    experiments = listExperiments({ includeUnmapped: true });
-    candidates = collectBestModelCandidates(experiments, metric);
-  }
   if (candidates.length === 0) {
     candidates = collectBestModelCandidatesFromMetricFiles(metric);
   }
@@ -477,23 +515,30 @@ function parseModelPathFromRunDir(runDir: string): {
   if (modelParts.length === 1) {
     const only = modelParts[0];
     if (!GRID_MODEL_PATTERN.test(only)) return null;
+    const group = NOTEBOOK_EXPERIMENT_GROUPS.find((item) =>
+      item.resultFolders.includes(VIRTUAL_GRID_SEARCH_EXPERIMENT)
+    );
+    if (!group) return null;
     return {
-      experiment: VIRTUAL_GRID_SEARCH_EXPERIMENT,
-      model: only,
-      experimentDisplayName: "Transformer Grid Search",
-      modelDisplayName: only.replace(/_/g, " "),
+      experiment: group.name,
+      model: `${VIRTUAL_GRID_SEARCH_EXPERIMENT}/${only}`,
+      experimentDisplayName: group.displayName,
+      modelDisplayName: `${displayNameForExperiment(VIRTUAL_GRID_SEARCH_EXPERIMENT)} / ${only.replace(/_/g, " ")}`,
     };
   }
 
   const [experiment, ...modelPartsOnly] = modelParts;
+  if (!ACTIVE_RESULT_FOLDERS.has(experiment)) return null;
   const model = modelPartsOnly.join("/");
+  const group = NOTEBOOK_EXPERIMENT_GROUPS.find((item) => item.resultFolders.includes(experiment));
+  if (!group) return null;
   return {
-    experiment,
-    model,
-    experimentDisplayName: displayNameForExperiment(experiment),
-    modelDisplayName: model
+    experiment: group.name,
+    model: `${experiment}/${model}`,
+    experimentDisplayName: group.displayName,
+    modelDisplayName: `${displayNameForExperiment(experiment)} / ${model
       .split("/")
       .map((seg) => seg.replace(/_/g, " ").replace(/\(([^)]+)\)/g, "($1)"))
-      .join(" / "),
+      .join(" / ")}`,
   };
 }

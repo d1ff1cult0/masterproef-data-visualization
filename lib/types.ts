@@ -102,156 +102,150 @@ export const MODEL_COLORS = [
 
 export const KEY_METRICS = ["MAE", "RMSE", "CRPS", "R2", "PICP", "IntervalScore"];
 
+export interface NotebookExperimentGroup {
+  name: string;
+  notebook: number;
+  displayName: string;
+  resultFolders: string[];
+}
+
 /**
- * Top-level result folders produced or consumed by the active notebooks in
- * `notebooks/Nb*.ipynb`. This is also the dashboard allowlist; folders only
- * referenced by `notebooks/legacy/` should not appear in the sidebar.
+ * Sidebar contract: exactly the active notebooks that live directly under
+ * `notebooks/`, excluding `Nb01_EDA.ipynb` because it is data analysis only.
  */
-export const EXPERIMENT_NOTEBOOK_MAP: Record<string, number> = {
-  head_study: 2,
-  head_study_torch: 2,
-  head_study_torch_rolling: 2,
+export const NOTEBOOK_EXPERIMENT_GROUPS: NotebookExperimentGroup[] = [
+  {
+    name: "nb02_output_head_study",
+    notebook: 2,
+    displayName: "Output Head Study",
+    resultFolders: ["head_study_torch"],
+  },
+  {
+    name: "nb03_architecture_optimization",
+    notebook: 3,
+    displayName: "Architecture Optimization",
+    resultFolders: [
+      "transformer_grid_search",
+      "window_length_study",
+      "transformer_optimization",
+      "dropout_model_size",
+      "arch_optimization_rolling",
+    ],
+  },
+  {
+    name: "nb04_rolling_recalibration",
+    notebook: 4,
+    displayName: "Rolling Recalibration",
+    resultFolders: ["rolling_evaluation", "rolling_recalibration"],
+  },
+  {
+    name: "nb05_preprocessing",
+    notebook: 5,
+    displayName: "Preprocessing",
+    resultFolders: ["preprocessing_study_online_rolling"],
+  },
+  {
+    name: "nb06_lear_benchmark",
+    notebook: 6,
+    displayName: "LEAR Benchmark",
+    resultFolders: ["probabilistic_lear_baseline", "lear_transformer_residual_rolling"],
+  },
+  {
+    name: "nb07_feature_selection",
+    notebook: 7,
+    displayName: "Feature Selection",
+    resultFolders: [
+      "dataset_v1_vs_v2",
+      "feature_selection_v2",
+      "feature_selection_rolling",
+      "feature_ablation_prices_vs_full",
+    ],
+  },
+  {
+    name: "nb08_ensemble_methods",
+    notebook: 8,
+    displayName: "Ensemble Methods",
+    resultFolders: [
+      "directions_210",
+      "price_floor_comparison",
+      "lear_transformer_ensemble",
+      "closing_the_gap",
+      "unified_best_config_cascade",
+    ],
+  },
+  {
+    name: "nb09_alternative_architectures",
+    notebook: 9,
+    displayName: "Alternative Architectures",
+    resultFolders: [
+      "benchmark",
+      "hybrid_comparison",
+      "moe_comparison",
+      "levy_processes_study",
+      "hybrid_sde_rolling",
+    ],
+  },
+  {
+    name: "nb10_conformal_calibration",
+    notebook: 10,
+    displayName: "Conformal Calibration",
+    resultFolders: ["sequential_conformal"],
+  },
+  {
+    name: "nb11_methodology",
+    notebook: 11,
+    displayName: "Methodology",
+    resultFolders: ["keras_pytorch_jsu_10run", "train_val_test_window_study", "val_split_trick"],
+  },
+  {
+    name: "nb12_final_results",
+    notebook: 12,
+    displayName: "Final Results",
+    resultFolders: ["rolling_quickstart", "rolling_quickstart_pit", "final_model"],
+  },
+  {
+    name: "nb13_lear_informed_transformer",
+    notebook: 13,
+    displayName: "LEAR Informed Transformer",
+    resultFolders: ["lear_informed_transformer"],
+  },
+  {
+    name: "nb14_reported_results",
+    notebook: 14,
+    displayName: "Reported Results",
+    resultFolders: ["reported_results"],
+  },
+  {
+    name: "nb15_perhour_conformal",
+    notebook: 15,
+    displayName: "Per-Hour Conformal",
+    resultFolders: ["perhour_conformal"],
+  },
+  {
+    name: "nb16_ensemble_probabilistic",
+    notebook: 16,
+    displayName: "Ensemble Probabilistic",
+    resultFolders: ["ensemble_probabilistic"],
+  },
+  {
+    name: "nb17_rolling_transformer_differencing_jsu_param_average",
+    notebook: 17,
+    displayName: "Rolling Transformer Differencing JSU Param Average",
+    resultFolders: ["rolling_transformer_differencing_jsu_param_average"],
+  },
+];
 
-  transformer_grid_search: 3,
-  window_length_study: 3,
-  transformer_optimization: 3,
-  dropout_model_size: 3,
-  arch_optimization_rolling: 3,
+export const ACTIVE_EXPERIMENT_NAMES = NOTEBOOK_EXPERIMENT_GROUPS.map((group) => group.name);
 
-  rolling_evaluation: 4,
-  rolling_recalibration: 4,
+export const EXPERIMENT_NOTEBOOK_MAP: Record<string, number> = Object.fromEntries(
+  NOTEBOOK_EXPERIMENT_GROUPS.map((group) => [group.name, group.notebook])
+);
 
-  preprocessing_study_online_rolling: 5,
+const EXPERIMENT_TIE_ORDER: Record<string, number> = Object.fromEntries(
+  NOTEBOOK_EXPERIMENT_GROUPS.map((group, index) => [group.name, index])
+);
 
-  probabilistic_lear_baseline: 6,
-  lear_transformer_residual_rolling: 6,
-  "13_improved_transformer": 6,
-
-  dataset_v1_vs_v2: 7,
-  feature_selection_v2: 7,
-  feature_selection_rolling: 7,
-  feature_ablation_prices_vs_full: 7,
-
-  directions_210: 8,
-  price_floor_comparison: 8,
-  lear_transformer_ensemble: 8,
-  closing_the_gap: 8,
-  unified_best_config_cascade: 8,
-
-  benchmark: 9,
-  hybrid_comparison: 9,
-  moe_comparison: 9,
-  levy_processes_study: 9,
-  hybrid_sde_rolling: 9,
-  patchtst: 9,
-
-  sequential_conformal: 10,
-
-  keras_pytorch_jsu_10run: 11,
-  train_val_test_window_study: 11,
-  train_val_test_window_study_lear: 11,
-  val_split_trick: 11,
-
-  rolling_quickstart: 12,
-  rolling_quickstart_pit: 12,
-  rolling_pit_full: 12,
-  final_model: 12,
-
-  lear_informed_transformer: 13,
-  reported_results: 14,
-  perhour_conformal: 15,
-  ensemble_probabilistic: 16,
-  rolling_transformer_differencing_jsu_param_average: 17,
-};
-
-export const ACTIVE_EXPERIMENT_NAMES = Object.keys(EXPERIMENT_NOTEBOOK_MAP);
-
-const EXPERIMENT_TIE_ORDER: Record<string, number> = {
-  head_study: 1,
-  head_study_torch: 2,
-  head_study_torch_rolling: 3,
-
-  transformer_grid_search: 1,
-  window_length_study: 2,
-  transformer_optimization: 3,
-  dropout_model_size: 4,
-  arch_optimization_rolling: 5,
-
-  rolling_evaluation: 1,
-  rolling_recalibration: 2,
-
-  probabilistic_lear_baseline: 1,
-  lear_transformer_residual_rolling: 2,
-  "13_improved_transformer": 3,
-
-  dataset_v1_vs_v2: 1,
-  feature_selection_v2: 2,
-  feature_selection_rolling: 3,
-  feature_ablation_prices_vs_full: 4,
-
-  directions_210: 1,
-  price_floor_comparison: 2,
-  lear_transformer_ensemble: 3,
-  closing_the_gap: 4,
-  unified_best_config_cascade: 5,
-
-  benchmark: 1,
-  hybrid_comparison: 2,
-  moe_comparison: 3,
-  levy_processes_study: 4,
-  hybrid_sde_rolling: 5,
-  patchtst: 6,
-
-  keras_pytorch_jsu_10run: 1,
-  train_val_test_window_study: 2,
-  train_val_test_window_study_lear: 3,
-  val_split_trick: 4,
-
-  rolling_quickstart: 1,
-  rolling_quickstart_pit: 2,
-  rolling_pit_full: 3,
-  final_model: 4,
-};
-
-/** Overrides numeric badge when one notebook maps to several result folders. */
-export const EXPERIMENT_NOTEBOOK_BADGE: Partial<Record<string, string>> = {
-  head_study: "2·1",
-  head_study_torch: "2·2",
-  head_study_torch_rolling: "2·3",
-  transformer_grid_search: "3·1",
-  window_length_study: "3·2",
-  transformer_optimization: "3·3",
-  dropout_model_size: "3·4",
-  arch_optimization_rolling: "3·5",
-  rolling_evaluation: "4·1",
-  rolling_recalibration: "4·2",
-  probabilistic_lear_baseline: "6·1",
-  lear_transformer_residual_rolling: "6·2",
-  "13_improved_transformer": "6·3",
-  dataset_v1_vs_v2: "7·1",
-  feature_selection_v2: "7·2",
-  feature_selection_rolling: "7·3",
-  feature_ablation_prices_vs_full: "7·4",
-  directions_210: "8·1",
-  price_floor_comparison: "8·2",
-  lear_transformer_ensemble: "8·3",
-  closing_the_gap: "8·4",
-  unified_best_config_cascade: "8·5",
-  benchmark: "9·1",
-  hybrid_comparison: "9·2",
-  moe_comparison: "9·3",
-  levy_processes_study: "9·4",
-  hybrid_sde_rolling: "9·5",
-  patchtst: "9·6",
-  keras_pytorch_jsu_10run: "11·1",
-  train_val_test_window_study: "11·2",
-  train_val_test_window_study_lear: "11·3",
-  val_split_trick: "11·4",
-  rolling_quickstart: "12·1",
-  rolling_quickstart_pit: "12·2",
-  rolling_pit_full: "12·3",
-  final_model: "12·4",
-};
+export const EXPERIMENT_NOTEBOOK_BADGE: Partial<Record<string, string>> = {};
 
 /** Sort key: primary notebook number, then the active-notebook folder order. */
 export function compareExperimentsByNotebook(aName: string, bName: string): number {
