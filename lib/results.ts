@@ -3,6 +3,14 @@ import path from "path";
 import type { Experiment, ModelInfo, ModelSummary, RunMetrics } from "./types";
 import { NOTEBOOK_EXPERIMENT_GROUPS } from "./types";
 import { METRIC_LABELS } from "./types";
+import {
+  bespokeFolderHasResults,
+  getBespokeNpzPath,
+  isBespokeFolder,
+  isBespokeModel,
+  listBespokeModels,
+  readBespokeMetrics,
+} from "./bespoke-results";
 
 function firstExistingPath(candidates: string[]): string {
   return candidates.find((candidate) => fs.existsSync(candidate)) ?? candidates[0];
@@ -228,6 +236,15 @@ function listModelsForResultFolder(folder: string, showFolder: boolean): ModelIn
     );
   }
 
+  if (isBespokeFolder(folder)) {
+    // Bespoke folders already namespace each model under `<folder>/<methodId>`.
+    return listBespokeModels(RESULTS_DIR, folder).map((model) =>
+      showFolder
+        ? { ...model, displayName: `${displayNameForExperiment(folder)} / ${model.displayName}` }
+        : model
+    );
+  }
+
   const dirPath = path.join(RESULTS_DIR, folder);
   if (!isExperimentDir(dirPath)) return [];
 
@@ -242,6 +259,9 @@ function createNotebookExperiment(group: (typeof NOTEBOOK_EXPERIMENT_GROUPS)[num
     if (folder === VIRTUAL_GRID_SEARCH_EXPERIMENT) {
       const entries = fs.existsSync(RESULTS_DIR) ? fs.readdirSync(RESULTS_DIR) : [];
       return listVirtualGridSearchExperiment(entries) != null;
+    }
+    if (isBespokeFolder(folder)) {
+      return bespokeFolderHasResults(RESULTS_DIR, folder);
     }
     return isExperimentDir(path.join(RESULTS_DIR, folder));
   });
@@ -262,6 +282,9 @@ export function listExperiments(options: { includeUnmapped?: boolean } = {}): Ex
 }
 
 export function readRunMetrics(experiment: string, model: string, runIdx: number): RunMetrics | null {
+  if (isBespokeModel(experiment, model)) {
+    return runIdx === 0 ? readBespokeMetrics(RESULTS_DIR, experiment, model) : null;
+  }
   const modelDir = resolveModelDir(experiment, model);
   const metricsPath = path.join(modelDir, `run_${runIdx}`, "metrics.json");
   const directMetricsPath = path.join(modelDir, "metrics.json");
@@ -275,6 +298,10 @@ export function readRunMetrics(experiment: string, model: string, runIdx: number
 }
 
 export function readAllRunMetrics(experiment: string, model: string): RunMetrics[] {
+  if (isBespokeModel(experiment, model)) {
+    const m = readBespokeMetrics(RESULTS_DIR, experiment, model);
+    return m ? [m] : [];
+  }
   const modelDir = resolveModelDir(experiment, model);
   if (!fs.existsSync(modelDir)) return [];
 
@@ -312,6 +339,9 @@ export function readModelSummary(experiment: string, model: string): ModelSummar
 }
 
 export function getPredictionsPath(experiment: string, model: string, runIdx: number): string {
+  if (isBespokeModel(experiment, model)) {
+    return getBespokeNpzPath(RESULTS_DIR, model) ?? path.join(resolveModelDir(experiment, model), "predictions.npz");
+  }
   const modelDir = resolveModelDir(experiment, model);
   const directPredictionsPath = path.join(modelDir, "predictions.npz");
   if (runIdx === 0 && fs.existsSync(directPredictionsPath)) return directPredictionsPath;
@@ -325,6 +355,9 @@ export function getModelResultsDir(experiment: string, model: string): string {
 
 /** Run indices under `modelDir` that have a `predictions.npz` file. */
 export function listRunsWithPredictions(experiment: string, model: string): number[] {
+  if (isBespokeModel(experiment, model)) {
+    return getBespokeNpzPath(RESULTS_DIR, model) ? [0] : [];
+  }
   const modelDir = getModelResultsDir(experiment, model);
   if (!fs.existsSync(modelDir) || !fs.statSync(modelDir).isDirectory()) return [];
   if (fs.existsSync(path.join(modelDir, "predictions.npz"))) return [0];
@@ -341,6 +374,9 @@ export function listRunsWithPredictions(experiment: string, model: string): numb
 }
 
 export function getRunCount(experiment: string, model: string): number {
+  if (isBespokeModel(experiment, model)) {
+    return listRunsWithPredictions(experiment, model).length;
+  }
   const modelDir = resolveModelDir(experiment, model);
   return getRunCountForModelDir(modelDir);
 }

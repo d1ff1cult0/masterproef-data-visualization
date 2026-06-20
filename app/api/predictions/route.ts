@@ -6,6 +6,7 @@ import {
   getPredictionsPath,
   listRunsWithPredictions,
 } from "@/lib/results";
+import { remapBespokeArrays } from "@/lib/bespoke-results";
 import { buildPredictionDataFromMergedArrays } from "@/lib/build-prediction-points";
 
 function pythonCandidates(): string[] {
@@ -122,7 +123,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(body, { status: 500 });
   }
 
-  let { keys, data, totalDays } = buildPredictionDataFromMergedArrays(merged.arrays);
+  const arrays = remapBespokeArrays(model, merged.arrays) ?? merged.arrays;
+  let { keys, data, totalDays } = buildPredictionDataFromMergedArrays(arrays);
   if (data.length === 0) {
     return NextResponse.json({ error: "empty_prediction_series" }, { status: 422 });
   }
